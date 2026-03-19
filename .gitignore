@@ -1,0 +1,40 @@
+
+# This contains your Groq, Aviationstack, and OpenTripMap keys.
+# DO NOT let this touch GitHub or the internet will steal your credits.
+.env
+
+# THE 'DEPENDENCY HELL' BUFFER
+# We don't upload the virtual environment because it's massive.
+# Users should run 'pip install -r requirements.txt' instead.
+venv/
+.venv/
+env/
+bin/
+lib/
+include/
+
+# THE 'PYTHON TRASH' BIN
+# These are compiled files Python creates so it can run faster next time. 
+# They are useless to other humans and just clutter the repo.
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# THE 'IDE JUNK' DRAWER
+# VS Code and PyCharm love to leave their little configuration folders behind.
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# THE 'OS CLUTTER'
+# Mac and Windows like to drop invisible files like they're leaving breadcrumbs.
+.DS_Store
+Thumbs.db
+
+# DATA & LOGS
+# If your agents start writing logs or saving local JSON data, 
+# we keep that off the cloud too.
+*.log
+data/*.json
+!data/sample_data.json # (Example: ignore all JSON except this one specific file)
