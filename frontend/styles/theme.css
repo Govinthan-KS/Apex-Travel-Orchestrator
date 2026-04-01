@@ -1,0 +1,185 @@
+/* ==========================================================
+   Apex Travel Orchestrator v2 — Cotton Candy Theme
+   Light Lime Green (#d1f0b1) + Sky Blue (#7ec8e3)
+   
+   This lime green is so bright it might actually fix my
+   seasonal depression. You're welcome.
+   ========================================================== */
+
+:root {
+  /* ── Brand Palette ── */
+  --primary-sky-blue: #7ec8e3;
+  --primary-lime-green: #d1f0b1;
+  --secondary-pale-pink: #f7d9d9;
+  --surface-cream: #f8fdf4;
+
+  /* ── Derived shades — I spent 3 hours on these, please appreciate them ── */
+  --primary-sky-blue-hover: #5bb8d9;
+  --primary-sky-blue-active: #3ca8cf;
+  --primary-sky-blue-light: #c4e8f5;
+  --primary-lime-green-light: #e8f8d8;
+  --primary-lime-green-dark: #a3d980;
+  --text-dark: #1a2e1a;
+  --text-muted: #5a6b5a;
+
+  /* ── PrimeReact Variable Overrides ── */
+  --primary-color: var(--primary-sky-blue);
+  --primary-color-text: #ffffff;
+  --primary-50: #eef8fc;
+  --primary-100: #c4e8f5;
+  --primary-200: #9ed8ed;
+  --primary-300: #7ec8e3;
+  --primary-400: #5bb8d9;
+  --primary-500: #7ec8e3;
+  --primary-600: #3ca8cf;
+  --primary-700: #2d96bd;
+  --primary-800: #1f84ab;
+  --primary-900: #0f6e92;
+
+  --surface-ground: var(--surface-cream);
+  --surface-section: #ffffff;
+  --surface-card: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-border: #d4e4d4;
+
+  --text-color: var(--text-dark);
+  --text-color-secondary: var(--text-muted);
+
+  --focus-ring: 0 0 0 3px rgba(126, 200, 227, 0.35);
+}
+
+/* ── PrimeReact Button Overrides ── */
+.p-button {
+  background: var(--primary-sky-blue) !important;
+  border-color: var(--primary-sky-blue) !important;
+  color: #ffffff !important;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 10px rgba(126, 200, 227, 0.3);
+}
+
+.p-button:hover {
+  background: var(--primary-sky-blue-hover) !important;
+  border-color: var(--primary-sky-blue-hover) !important;
+  box-shadow: 0 4px 16px rgba(126, 200, 227, 0.45);
+  transform: translateY(-2px);
+}
+
+.p-button:active {
+  background: var(--primary-sky-blue-active) !important;
+  border-color: var(--primary-sky-blue-active) !important;
+  transform: translateY(0);
+}
+
+.p-button:focus {
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* ── Lime Green Button Variant ── */
+.p-button.btn-lime {
+  background: var(--primary-lime-green) !important;
+  border-color: var(--primary-lime-green-dark) !important;
+  color: var(--text-dark) !important;
+  box-shadow: 0 2px 10px rgba(209, 240, 177, 0.4);
+}
+
+.p-button.btn-lime:hover {
+  background: var(--primary-lime-green-dark) !important;
+  box-shadow: 0 4px 16px rgba(163, 217, 128, 0.5);
+}
+
+/* ── PrimeReact InputText Overrides ── */
+.p-inputtext:focus {
+  border-color: var(--primary-sky-blue) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* ── PrimeReact Steps ── */
+.p-steps .p-steps-item .p-menuitem-link .p-steps-number {
+  background: var(--primary-sky-blue) !important;
+  color: #ffffff !important;
+  border: 2px solid var(--primary-sky-blue) !important;
+}
+
+.p-steps .p-steps-item.p-highlight .p-menuitem-link .p-steps-number {
+  background: var(--primary-lime-green-dark) !important;
+  border-color: var(--primary-lime-green-dark) !important;
+}
+
+/* ── PrimeReact Card Overrides ── */
+.p-card {
+  border-radius: 14px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05);
+}
+
+/* ── PrimeReact SelectButton Overrides ── */
+.p-selectbutton {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+}
+
+.p-selectbutton .p-togglebutton {
+  border-radius: 10px !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  border: 1.5px solid var(--surface-border) !important;
+  background: #ffffff !important;
+  color: var(--text-dark) !important;
+  transition: all 0.2s ease !important;
+}
+
+.p-selectbutton .p-togglebutton.p-highlight {
+  background: var(--primary-sky-blue) !important;
+  border-color: var(--primary-sky-blue) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(126, 200, 227, 0.35) !important;
+}
+
+.p-selectbutton .p-togglebutton:hover:not(.p-highlight) {
+  border-color: var(--primary-sky-blue-light) !important;
+  background: var(--primary-50) !important;
+}
+
+/* ── PrimeReact Chips ── */
+.p-chips .p-chips-token {
+  background: var(--primary-lime-green) !important;
+  color: var(--text-dark) !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}
+
+/* ── PrimeReact Slider ── */
+.p-slider .p-slider-range {
+  background: var(--primary-sky-blue) !important;
+}
+
+.p-slider .p-slider-handle {
+  border-color: var(--primary-sky-blue) !important;
+}
+
+/* ── PrimeReact Calendar ── */
+.p-datepicker .p-datepicker-header {
+  background: var(--primary-lime-green-light) !important;
+}
+
+/* ── PrimeReact Timeline ── */
+.p-timeline .p-timeline-event-connector {
+  background-color: var(--primary-sky-blue) !important;
+}
+
+/* ── PrimeReact MultiSelect Overrides ── */
+.p-multiselect {
+  border-radius: 10px !important;
+}
+
+.p-multiselect:hover {
+  border-color: var(--primary-sky-blue) !important;
+}
+
+.p-multiselect.p-focus {
+  border-color: var(--primary-sky-blue) !important;
+  box-shadow: var(--focus-ring) !important;
+}
