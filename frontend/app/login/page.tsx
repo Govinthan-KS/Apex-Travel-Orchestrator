@@ -134,7 +134,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div style={{ textAlign: "center", padding: "2rem" }}>Loading...</div>}>
       <LoginContent />
     </Suspense>
   );
