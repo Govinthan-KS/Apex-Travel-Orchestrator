@@ -9,9 +9,6 @@
 venv/
 .venv/
 env/
-bin/
-lib/
-include/
 
 # THE 'PYTHON TRASH' BIN
 # These are compiled files Python creates so it can run faster next time. 
