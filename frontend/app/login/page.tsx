@@ -12,13 +12,13 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
 import { useApexToast } from "@/components/ToastProvider";
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const { showWarn } = useApexToast();
   const hasShownToast = useRef(false);
@@ -129,5 +129,13 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }
