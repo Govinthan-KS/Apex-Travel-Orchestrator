@@ -38,17 +38,15 @@ logger = logging.getLogger(__name__)
 # Singleton Initialization
 # ──────────────────────────────────────────────────────────────
 
-# Load the embedding model once at module level.
-# all-MiniLM-L6-v2 is ~80 MB and runs on CPU with sub-ms latency.
-_embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+# Load the embedding model lazily inside _vectorize to pass Render startup checks!
+_embed_model = None
 
 # Initialize Pinecone client and grab the index handle.
 _pc = Pinecone(api_key=PINECONE_API_KEY)
 _index = _pc.Index(PINECONE_INDEX_NAME)
 
 logger.info(
-    "Memory store initialized — model=%s, index=%s, dim=%d",
-    EMBEDDING_MODEL_NAME,
+    "Memory store initialized — index=%s, dim=%d",
     PINECONE_INDEX_NAME,
     EMBEDDING_DIMENSION,
 )
@@ -60,6 +58,12 @@ logger.info(
 
 def _vectorize(text: str) -> list[float]:
     """Convert a text string to a 384-dim embedding vector."""
+    global _embed_model
+    if _embed_model is None:
+        logger.info("Lazy-loading PyTorch model: %s...", EMBEDDING_MODEL_NAME)
+        from sentence_transformers import SentenceTransformer
+        _embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        
     return _embed_model.encode(text).tolist()
 
 
