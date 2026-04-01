@@ -54,17 +54,17 @@ export async function GET() {
     const flightClassWeights: Record<string, number> =
       frequencyWeight?.flightClass instanceof Map
         ? Object.fromEntries(frequencyWeight.flightClass)
-        : (frequencyWeight?.flightClass as Record<string, number>) ?? {};
+        : (frequencyWeight?.flightClass as unknown as Record<string, number>) ?? {};
 
     const stayTierWeights: Record<string, number> =
       frequencyWeight?.stayTier instanceof Map
         ? Object.fromEntries(frequencyWeight.stayTier)
-        : (frequencyWeight?.stayTier as Record<string, number>) ?? {};
+        : (frequencyWeight?.stayTier as unknown as Record<string, number>) ?? {};
 
     const interestsWeights: Record<string, number> =
       frequencyWeight?.interests instanceof Map
         ? Object.fromEntries(frequencyWeight.interests)
-        : (frequencyWeight?.interests as Record<string, number>) ?? {};
+        : (frequencyWeight?.interests as unknown as Record<string, number>) ?? {};
 
     // Extract interest names with weight > 0 as an array
     const activeInterests = Object.entries(interestsWeights)
