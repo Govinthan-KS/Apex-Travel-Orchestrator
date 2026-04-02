@@ -22,10 +22,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-from memory_store import upsert_user_vibe, retrieve_relevant_vibes
-from brain_hook import get_augmented_context
-from agents.coordinator_agent import run_coordinator_agent
-from auth_utils import verify_signature
+# Heavy imports moved inside routes/functions to pass Render port-binding health checks.
+# from memory_store import upsert_user_vibe, retrieve_relevant_vibes
+# from brain_hook import get_augmented_context
+# from agents.coordinator_agent import run_coordinator_agent
+# from auth_utils import verify_signature
 
 # Logging
 
@@ -43,10 +44,12 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# CORS — allow the Next.js frontend
+# CORS — allow the Next.js frontend or a production URL
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[frontend_url, "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -120,6 +123,7 @@ async def sync_vibe(req: SyncVibeRequest):
         )
 
     try:
+        from memory_store import upsert_user_vibe
         result = upsert_user_vibe(req.user_id, req.vibe_text.strip())
         return SyncVibeResponse(
             status="ok",
@@ -146,6 +150,7 @@ async def get_context(req: ContextRequest):
         )
 
     try:
+        from brain_hook import get_augmented_context
         context = get_augmented_context(
             user_id=req.user_id,
             query=req.query.strip(),
@@ -197,6 +202,7 @@ async def plan_trip(
             pass # Invalid format, ignore for now
 
     # HMAC Guard — verify DNA signature before burning Groq credits
+    from auth_utils import verify_signature
     shared_secret = os.getenv("INTERNAL_SHARED_SECRET", "")
     if shared_secret and req.dna:
         if not x_apex_signature:
@@ -213,6 +219,7 @@ async def plan_trip(
         logger.info("HMAC signature verified for user %s", req.user_id)
 
     try:
+        from agents.coordinator_agent import run_coordinator_agent
         logger.info("Planning trip for user %s: '%s'", req.user_id, req.query[:60])
         itinerary = run_coordinator_agent(req.user_id, req.query.strip(), dna=req.dna)
         return PlanResponse(
@@ -260,6 +267,7 @@ def run_cli():
         print("\nThe Strategic Orchestrator is assembling the team... Please wait.\n")
 
         try:
+            from agents.coordinator_agent import run_coordinator_agent
             itinerary = run_coordinator_agent(user_id, user_input, dna=None)
             print("\n" + "=" * 50)
             print("YOUR PERSONALIZED ITINERARY")

@@ -22,8 +22,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", message=".*UNEXPECTED.*")
 warnings.filterwarnings("ignore", message=".*unauthenticated.*")
 
-from sentence_transformers import SentenceTransformer
-from pinecone import Pinecone
+# Heavy imports moved inside functions to pass Render port-binding health checks.
+# from sentence_transformers import SentenceTransformer
+# from pinecone import Pinecone
 
 from config import (
     PINECONE_API_KEY,
@@ -40,15 +41,20 @@ logger = logging.getLogger(__name__)
 
 # Load the embedding model lazily inside _vectorize to pass Render startup checks!
 _embed_model = None
+_index = None
 
-# Initialize Pinecone client and grab the index handle.
-_pc = Pinecone(api_key=PINECONE_API_KEY)
-_index = _pc.Index(PINECONE_INDEX_NAME)
+def _get_pinecone_index():
+    """Lazily initialize the Pinecone index handle."""
+    global _index
+    if _index is None:
+        from pinecone import Pinecone
+        _pc = Pinecone(api_key=PINECONE_API_KEY)
+        _index = _pc.Index(PINECONE_INDEX_NAME)
+        logger.info("Pinecone index '%s' initialized.", PINECONE_INDEX_NAME)
+    return _index
 
 logger.info(
-    "Memory store initialized — index=%s, dim=%d",
-    PINECONE_INDEX_NAME,
-    EMBEDDING_DIMENSION,
+    "Memory store module loaded (Lazy-Loading enabled).",
 )
 
 
@@ -86,7 +92,8 @@ def upsert_user_vibe(user_id: str, text_description: str) -> dict:
     vector = _vectorize(text_description)
     vector_id = f"vibe-{uuid.uuid4().hex[:12]}"
 
-    _index.upsert(
+    index = _get_pinecone_index()
+    index.upsert(
         vectors=[
             {
                 "id": vector_id,
@@ -122,7 +129,8 @@ def retrieve_relevant_vibes(
     """
     query_vector = _vectorize(current_query)
 
-    results = _index.query(
+    index = _get_pinecone_index()
+    results = index.query(
         vector=query_vector,
         top_k=top_k,
         include_metadata=True,
