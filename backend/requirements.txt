@@ -18,6 +18,10 @@ huggingface_hub==1.8.0
 idna==3.11
 Jinja2==3.1.6
 joblib==1.5.3
+langchain==0.3.17
+langchain-core==0.3.34
+langchain-groq==0.2.4
+langchain-community==0.3.16
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
