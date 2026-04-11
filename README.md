@@ -11,7 +11,7 @@ This system utilizes a Hierarchical Manager-Worker Architecture where a central 
 1. **User Onboarding:** A new user logs in via Google OAuth and completes a multi-step survey. Their preferences (Budget, Dietary Constraints, Travel Pace, Accessibility needs, and Home Hub airport) are saved into MongoDB as their Core DNA.
 2. **Dashboard Query:** The user enters a trip request (e.g., "3 days in Paris") into the Next.js frontend dashboard.
 3. **DNA Session Retrieval:** The frontend fetches the user's DNA constraints from MongoDB and packages them alongside the query, creating an HMAC-signed secure payload.
-4. **Pinecone Semantic Memory Check:** The FastAPI backend receives the payload and queries the Pinecone Vector DB using `sentence-transformers` to see if the user has documented past trips or "soft memories" that share a similar contextual "vibe."
+4. **Pinecone Semantic Memory Check:** The FastAPI backend receives the payload and queries the Pinecone Vector DB using embeddings generated via the Hugging Face Inference API, replacing local model inference to enable lightweight, cloud-compatible deployment
 5. **Agentic Orchestration:** The Coordinator Agent receives the user's query enriched with both their Hard DNA Constraints and Soft Memories. It isolates tasks and delegates them:
    - It sends the Flight Specialist to fetch flights originating exclusively from the user's Home Hub.
    - It sends the Hotel Specialist to query properties that map to the user's budget and tier-preferences.
@@ -51,7 +51,7 @@ The LangChain engine parses incoming requests and distributes them using Groq (L
 **Backend / AI (/backend)**
 * FastAPI, Uvicorn
 * LangChain (AgentExecutors, custom Tools)
-* Groq LLM API, Pinecone Vector DB, Sentence-Transformers
+* Groq LLM API, Pinecone Vector DB, Hugging Face Inference API (Embeddings)
 
 ---
 
