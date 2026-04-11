@@ -31,6 +31,7 @@ from config import (
     PINECONE_INDEX_NAME,
     EMBEDDING_MODEL_NAME,
     EMBEDDING_DIMENSION,
+    HUGGINGFACE_API_KEY,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,14 +64,23 @@ logger.info(
 # ──────────────────────────────────────────────────────────────
 
 def _vectorize(text: str) -> list[float]:
-    """Convert a text string to a 384-dim embedding vector."""
+    """Convert a text string to a 384-dim embedding vector using Hugging Face API."""
     global _embed_model
     if _embed_model is None:
-        logger.info("Lazy-loading PyTorch model: %s...", EMBEDDING_MODEL_NAME)
-        from sentence_transformers import SentenceTransformer
-        _embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        logger.info("Lazy-loading Hugging Face Inference Client: %s...", EMBEDDING_MODEL_NAME)
+        from huggingface_hub import InferenceClient
+        # Initialize inference client
+        _embed_model = InferenceClient(api_key=HUGGINGFACE_API_KEY)
         
-    return _embed_model.encode(text).tolist()
+    try:
+        embedding = _embed_model.feature_extraction(
+            model=EMBEDDING_MODEL_NAME,
+            inputs=text
+        )
+        return embedding
+    except Exception as e:
+        logger.error("Error calling Hugging Face Inference API: %s", str(e))
+        raise
 
 
 # ──────────────────────────────────────────────────────────────

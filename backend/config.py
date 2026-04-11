@@ -15,7 +15,8 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "apex-user-memory")
 
 
 # Embedding Model
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_DIMENSION = 384
 
 # Model Settings
@@ -25,4 +26,4 @@ MAX_ITERATIONS = 15
 MAX_RESULTS = 5
 
 # Frontend API (Logistics DNA bridge)
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
