@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showSuccess, showError, showWarn, showInfo, showRaw }}>
       {children}
       {isMounted && createPortal(
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm pointer-events-none">
+        <div className="fixed top-24 right-6 z-50 flex flex-col gap-3 max-w-sm pointer-events-none">
           {toasts.map((toast) => (
             <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
           ))}
@@ -89,29 +89,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastItem({ toast, onClose }: { toast: ToastMessage, onClose: () => void }) {
   const icons = {
-    success: "pi-check-circle text-emerald-500",
+    success: "pi-check-circle text-lime-400",
     error: "pi-times-circle text-rose-500",
-    warn: "pi-exclamation-triangle text-amber-500",
-    info: "pi-info-circle text-indigo-500"
+    warn: "pi-exclamation-triangle text-amber-400",
+    info: "pi-info-circle text-indigo-400"
   };
 
   const borderColors = {
-    success: "border-emerald-500",
+    success: "border-lime-500",
     error: "border-rose-500",
     warn: "border-amber-500",
     info: "border-indigo-500"
   };
 
   return (
-    <div className={`pointer-events-auto bg-white border-l-4 ${borderColors[toast.severity]} rounded-xl shadow-lg border border-slate-200 p-4 flex gap-4 items-start animate-fade-in-up`}>
+    <div className={`pointer-events-auto bg-slate-900 border-l-4 ${borderColors[toast.severity]} rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-slate-800 p-4 flex gap-4 items-start animate-fade-in-up`}>
       <i className={`pi ${icons[toast.severity]} text-2xl mt-0.5`} />
       <div className="flex-1">
-        <h4 className="font-semibold text-slate-900 m-0 leading-tight">{toast.summary}</h4>
-        <p className="text-slate-500 mt-1 mb-0 text-sm">{toast.detail}</p>
+        <h4 className="font-semibold text-slate-200 m-0 leading-tight">{toast.summary}</h4>
+        <p className="text-slate-400 mt-1 mb-0 text-sm">{toast.detail}</p>
       </div>
       <button 
         onClick={onClose} 
-        className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100 flex-shrink-0"
+        className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-full hover:bg-slate-800 flex-shrink-0"
         aria-label="Close"
       >
         <i className="pi pi-times" />
