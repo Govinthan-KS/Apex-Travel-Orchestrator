@@ -9,7 +9,6 @@ import "primeicons/primeicons.css";
 import "primeflex/primeflex.css";
 
 /* ── Our Theme & Globals — the real magic starts here ── */
-import "@/styles/theme.css";
 import "./globals.css";
 
 /* ── Components — the building blocks of this lime-green empire ── */

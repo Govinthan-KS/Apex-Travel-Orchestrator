@@ -1,152 +1,116 @@
-/*
- * Toast Provider — components/ToastProvider.tsx
- * ================================================
- * The global notification system for Apex V2.
- *
- * This toast is greener than the leaf on a MongoDB logo.
- *
- * V2.1 Theme: MongoDB-inspired Dark/Green
- *   - Success: #001E2B background, #00ED64 accent
- *   - Error: Dark crimson with red accent
- *   - Warn: Dark amber with gold accent
- *   - Info: Dark navy with Sky Blue accent
- *
- * Usage:
- *   const { showSuccess, showError, showWarn, showInfo } = useApexToast();
- *   showSuccess("Title", "Message");
- */
-
 "use client";
 
-import { createContext, useContext, useRef, useCallback, type ReactNode } from "react";
-import { Toast, type ToastMessage } from "primereact/toast";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
-/* ──────────────────────────────────────────────────────────── */
-/* Toast Context & Types                                        */
-/* ──────────────────────────────────────────────────────────── */
+type ToastSeverity = "success" | "error" | "warn" | "info";
+
+export interface ToastMessage {
+  id: string;
+  severity: ToastSeverity;
+  summary: string;
+  detail: string;
+}
 
 interface ApexToastContext {
   showSuccess: (summary: string, detail: string) => void;
   showError: (summary: string, detail: string) => void;
   showWarn: (summary: string, detail: string) => void;
   showInfo: (summary: string, detail: string) => void;
-  showRaw: (msg: ToastMessage) => void;
+  showRaw: (msg: Omit<ToastMessage, "id">) => void;
 }
 
 const ToastContext = createContext<ApexToastContext | null>(null);
 
-/* ──────────────────────────────────────────────────────────── */
-/* Custom Hook                                                  */
-/* ──────────────────────────────────────────────────────────── */
-
 export function useApexToast(): ApexToastContext {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    throw new Error("useApexToast must be used within <ToastProvider>. Did you forget to wrap your app?");
+    throw new Error("useApexToast must be used within <ToastProvider>.");
   }
   return ctx;
 }
 
-/* ──────────────────────────────────────────────────────────── */
-/* MongoDB-Inspired Styles                                      */
-/*                                                              */
-/* This toast is greener than the leaf on a MongoDB logo.       */
-/* Using official MongoDB palette: #001E2B (dark) + #00ED64    */
-/* (green accent). Professional enough for a bank, snarky       */
-/* enough for a hackathon.                                      */
-/* ──────────────────────────────────────────────────────────── */
-
-const MONGO_SUCCESS_STYLE: React.CSSProperties = {
-  background: "#001E2B",
-  color: "#ffffff",
-  borderLeft: "5px solid #00ED64",
-  borderRadius: "10px",
-  boxShadow: "0 4px 20px rgba(0, 30, 43, 0.4)",
-};
-
-const MONGO_ERROR_STYLE: React.CSSProperties = {
-  background: "#3B0A0A",
-  color: "#ffffff",
-  borderLeft: "5px solid #ff6b6b",
-  borderRadius: "10px",
-  boxShadow: "0 4px 20px rgba(59, 10, 10, 0.4)",
-};
-
-const MONGO_WARN_STYLE: React.CSSProperties = {
-  background: "#3D2800",
-  color: "#ffffff",
-  borderLeft: "5px solid #ffd700",
-  borderRadius: "10px",
-  boxShadow: "0 4px 20px rgba(61, 40, 0, 0.4)",
-};
-
-const MONGO_INFO_STYLE: React.CSSProperties = {
-  background: "#001E2B",
-  color: "#ffffff",
-  borderLeft: "5px solid #7ec8e3",
-  borderRadius: "10px",
-  boxShadow: "0 4px 20px rgba(0, 30, 43, 0.4)",
-};
-
-/* ──────────────────────────────────────────────────────────── */
-/* Provider Component                                           */
-/* ──────────────────────────────────────────────────────────── */
-
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const toast = useRef<Toast>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const addToast = useCallback((msg: Omit<ToastMessage, "id">) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { ...msg, id }]);
+    
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      removeToast(id);
+    }, 4000);
+  }, [removeToast]);
 
   const showSuccess = useCallback((summary: string, detail: string) => {
-    toast.current?.show({
-      severity: "success",
-      summary,
-      detail,
-      life: 3500,
-      style: MONGO_SUCCESS_STYLE,
-      icon: "pi pi-check-circle",
-    });
-  }, []);
+    addToast({ severity: "success", summary, detail });
+  }, [addToast]);
 
   const showError = useCallback((summary: string, detail: string) => {
-    toast.current?.show({
-      severity: "error",
-      summary,
-      detail,
-      life: 4500,
-      style: MONGO_ERROR_STYLE,
-      icon: "pi pi-times-circle",
-    });
-  }, []);
+    addToast({ severity: "error", summary, detail });
+  }, [addToast]);
 
   const showWarn = useCallback((summary: string, detail: string) => {
-    toast.current?.show({
-      severity: "warn",
-      summary,
-      detail,
-      life: 4000,
-      style: MONGO_WARN_STYLE,
-      icon: "pi pi-exclamation-triangle",
-    });
-  }, []);
+    addToast({ severity: "warn", summary, detail });
+  }, [addToast]);
 
   const showInfo = useCallback((summary: string, detail: string) => {
-    toast.current?.show({
-      severity: "info",
-      summary,
-      detail,
-      life: 3500,
-      style: MONGO_INFO_STYLE,
-      icon: "pi pi-info-circle",
-    });
-  }, []);
+    addToast({ severity: "info", summary, detail });
+  }, [addToast]);
 
-  const showRaw = useCallback((msg: ToastMessage) => {
-    toast.current?.show(msg);
-  }, []);
+  const showRaw = useCallback((msg: Omit<ToastMessage, "id">) => {
+    addToast(msg);
+  }, [addToast]);
 
   return (
     <ToastContext.Provider value={{ showSuccess, showError, showWarn, showInfo, showRaw }}>
-      <Toast ref={toast} position="top-right" />
       {children}
+      {typeof window !== "undefined" && createPortal(
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm pointer-events-none">
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+          ))}
+        </div>,
+        document.body
+      )}
     </ToastContext.Provider>
+  );
+}
+
+function ToastItem({ toast, onClose }: { toast: ToastMessage, onClose: () => void }) {
+  const icons = {
+    success: "pi-check-circle text-emerald-500",
+    error: "pi-times-circle text-rose-500",
+    warn: "pi-exclamation-triangle text-amber-500",
+    info: "pi-info-circle text-indigo-500"
+  };
+
+  const borderColors = {
+    success: "border-emerald-500",
+    error: "border-rose-500",
+    warn: "border-amber-500",
+    info: "border-indigo-500"
+  };
+
+  return (
+    <div className={`pointer-events-auto bg-white border-l-4 ${borderColors[toast.severity]} rounded-xl shadow-lg border border-slate-200 p-4 flex gap-4 items-start animate-fade-in-up`}>
+      <i className={`pi ${icons[toast.severity]} text-2xl mt-0.5`} />
+      <div className="flex-1">
+        <h4 className="font-semibold text-slate-900 m-0 leading-tight">{toast.summary}</h4>
+        <p className="text-slate-500 mt-1 mb-0 text-sm">{toast.detail}</p>
+      </div>
+      <button 
+        onClick={onClose} 
+        className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100 flex-shrink-0"
+        aria-label="Close"
+      >
+        <i className="pi pi-times" />
+      </button>
+    </div>
   );
 }
