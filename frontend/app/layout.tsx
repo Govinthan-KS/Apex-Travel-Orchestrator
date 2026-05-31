@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import { PrimeReactProvider } from "primereact/api";
 import { SessionProvider } from "next-auth/react";
 
-/* ── PrimeReact Core CSS ── */
-import "primereact/resources/themes/lara-light-blue/theme.css";
-import "primereact/resources/primereact.min.css";
 import "primeicons/primeicons.css";
-import "primeflex/primeflex.css";
 
 /* ── Our Theme & Globals — the real magic starts here ── */
 import "./globals.css";
@@ -38,14 +34,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <PrimeReactProvider>
           <SessionProvider>
             <ToastProvider>
               <Navbar />
               {children}
             </ToastProvider>
           </SessionProvider>
-        </PrimeReactProvider>
       </body>
     </html>
   );

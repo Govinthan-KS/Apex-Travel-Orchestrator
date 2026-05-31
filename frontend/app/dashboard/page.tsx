@@ -3,9 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Dropdown } from "primereact/dropdown";
-import { Slider } from "primereact/slider";
-import { Calendar } from "primereact/calendar";
 import { useApexToast } from "@/components/ToastProvider";
 import { ItineraryTimeline, type TimelineEvent } from "@/components/ItineraryTimeline";
 
@@ -93,9 +90,13 @@ export default function DashboardPage() {
   }, [status, router]);
 
   const [activeStep, setActiveStep] = useState(0);
-  const [destination, setDestination] = useState<string | null>(null);
-  const [budget, setBudget] = useState(500);
-  const [dateRange, setDateRange] = useState<Date[] | null>(null);
+  const [destination, setDestination] = useState<string>("");
+  const [budget, setBudget] = useState(2500);
+  
+  // Using native dates instead of range picker
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [pace, setPace] = useState("moderate");
 
@@ -116,24 +117,26 @@ export default function DashboardPage() {
 
   const buildQuery = useCallback(() => {
     let days = 3;
-    if (dateRange && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
-      days = Math.ceil((dateRange[1].getTime() - dateRange[0].getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     }
-    let query = `${days} days in ${destination}, $${budget} budget`;
+    let query = `${days > 0 ? days : 3} days in ${destination}, $${budget} budget`;
     if (selectedInterests.length > 0) {
       query += `, interests: ${selectedInterests.join(", ")}`;
     }
     query += `, pace: ${pace}`;
     return query;
-  }, [destination, budget, dateRange, selectedInterests, pace]);
+  }, [destination, budget, startDate, endDate, selectedInterests, pace]);
 
   const planTrip = useCallback(async () => {
     if (!destination) return;
 
-    if (dateRange && dateRange[0]) {
+    if (startDate) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const start = new Date(dateRange[0]);
+      const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
       const diffTime = start.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -142,8 +145,8 @@ export default function DashboardPage() {
         showError("Validation Error", "Trips can only be scheduled up to 21 days in advance.");
         return;
       }
-      if (dateRange[1]) {
-        const end = new Date(dateRange[1]);
+      if (endDate) {
+        const end = new Date(endDate);
         end.setHours(0, 0, 0, 0);
         const tripLengthDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         if (tripLengthDays > 5) {
@@ -183,7 +186,7 @@ export default function DashboardPage() {
           user_id: dna.user_id,
           query,
           dna,
-          ...(dateRange && dateRange[0] ? { start_date: dateRange[0].toISOString() } : {}),
+          ...(startDate ? { start_date: new Date(startDate).toISOString() } : {}),
         }),
       });
 
@@ -215,8 +218,10 @@ export default function DashboardPage() {
 
           if (totalCost > 0 && totalCost <= budget + 150) {
             let days = 3;
-            if (dateRange && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
-              days = Math.ceil((dateRange[1].getTime() - dateRange[0].getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            if (startDate && endDate) {
+              const start = new Date(startDate);
+              const end = new Date(endDate);
+              days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
             }
             fetch("/api/trips", {
               method: "POST",
@@ -240,7 +245,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [destination, buildQuery, budget, dateRange, showError, showSuccess]);
+  }, [destination, buildQuery, budget, startDate, endDate, showError, showSuccess]);
 
   const canProceed = () => {
     if (activeStep === 0) return !!destination;
@@ -319,16 +324,22 @@ export default function DashboardPage() {
           {activeStep === 0 && (
             <div className="animate-fade-in-up">
               <h3 className="text-2xl font-bold mb-6 text-slate-900">Where to?</h3>
-              <Dropdown 
-                id="destination-select" 
-                value={destination} 
-                options={DESTINATIONS} 
-                onChange={(e) => setDestination(e.value)} 
-                placeholder="Search for a city..." 
-                filter 
-                filterPlaceholder="Type to search" 
-                className="w-full h-14 flex items-center" 
-              />
+              <div className="relative">
+                <select
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  className="w-full h-14 pl-4 pr-10 rounded-xl border border-slate-300 bg-white text-slate-900 text-lg appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all cursor-pointer shadow-sm"
+                >
+                  <option value="" disabled>Select a destination...</option>
+                  {DESTINATIONS.map(d => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                  <i className="pi pi-chevron-down text-slate-400" />
+                </div>
+              </div>
+              
               {destination && (
                 <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200 inline-flex items-center gap-3 font-semibold shadow-sm">
                   <i className="pi pi-map-marker text-indigo-600 text-xl" />
@@ -348,7 +359,15 @@ export default function DashboardPage() {
                   <label className="font-semibold text-slate-700 text-sm uppercase tracking-wider">Total Budget</label>
                   <span className="text-3xl font-extrabold text-indigo-600">${budget}</span>
                 </div>
-                <Slider value={budget} onChange={(e) => setBudget(e.value as number)} min={100} max={10000} step={50} className="w-full" />
+                <input 
+                  type="range" 
+                  value={budget} 
+                  onChange={(e) => setBudget(Number(e.target.value))} 
+                  min={100} 
+                  max={10000} 
+                  step={50} 
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" 
+                />
                 <div className="flex justify-between text-xs font-medium text-slate-400 mt-3">
                   <span>$100</span>
                   <span>$10,000</span>
@@ -360,18 +379,28 @@ export default function DashboardPage() {
                   <label className="font-semibold text-slate-700 text-sm uppercase tracking-wider">Travel Dates</label>
                   <span className="text-xs font-medium text-slate-400">(optional)</span>
                 </div>
-                <Calendar 
-                  id="date-range" 
-                  value={dateRange} 
-                  onChange={(e) => setDateRange(e.value as Date[] | null)} 
-                  selectionMode="range" 
-                  readOnlyInput 
-                  placeholder="Select date range" 
-                  className="w-full h-14" 
-                  minDate={new Date()} 
-                  maxDate={new Date(new Date().setDate(new Date().getDate() + 21))} 
-                  dateFormat="dd M yy" 
-                />
+                <div className="flex gap-4 flex-col sm:flex-row">
+                  <div className="flex-1">
+                    <span className="block text-xs text-slate-500 mb-1">Start Date</span>
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={(e) => setStartDate(e.target.value)}
+                      min={new Date().toISOString().split("T")[0]}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <span className="block text-xs text-slate-500 mb-1">End Date</span>
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={startDate || new Date().toISOString().split("T")[0]}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}

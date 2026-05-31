@@ -1,18 +1,3 @@
-/*
- * Navbar — components/Navbar.tsx
- * ================================
- * Now you see the login button, now you don't.
- * It's not magic, it's just hooks.
- *
- * V2.1:
- *   - Logged Out: "Login" (Sky Blue)
- *   - Logged In: "Dashboard" + Profile avatar + "Sign Out"
- *   - Sign Out: Fully nukes cookies + localStorage to prevent
- *     the "ghost session" bug where Google silently logs you
- *     back into the previous account.
- *   - Login success: Shows "Welcome back, [Name]!" toast
- */
-
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -26,11 +11,6 @@ export default function Navbar() {
   const isLoggedIn = status === "authenticated";
   const hasShownWelcome = useRef(false);
 
-  /*
-   * Welcome toast — fires once when the session transitions
-   * from loading → authenticated. Uses a ref guard so it
-   * doesn't fire on every re-render (because React is clingy).
-   */
   useEffect(() => {
     if (isLoggedIn && !hasShownWelcome.current && session?.user?.name) {
       const firstName = session.user.name.split(" ")[0];
@@ -42,119 +22,62 @@ export default function Navbar() {
     }
   }, [isLoggedIn, session, showSuccess]);
 
-  /*
-   * Sign Out — the nuclear option.
-   * Clears the NextAuth session, then wipes any leftover
-   * cookies and localStorage crumbs. We're not leaving
-   * ghost sessions behind. Not again.
-   */
   const handleSignOut = async () => {
     showSuccess("Session Ended 👋", "Successfully logged out. See you soon!");
-
-    /* Small delay so the toast is visible before the page nukes itself */
     setTimeout(async () => {
       await signOut({ callbackUrl: "/" });
     }, 1000);
   };
 
   return (
-    <nav className="apex-nav">
+    <nav className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
       {/* Logo */}
-      <Link href="/" className="apex-nav-logo" style={{ textDecoration: "none" }}>
-        <i className="pi pi-globe" style={{ fontSize: "1.4rem", color: "#7ec8e3" }} />
-        <span>Apex</span>
+      <Link href="/" className="flex items-center gap-2 text-slate-900 hover:opacity-80 transition-opacity">
+        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+          <i className="pi pi-globe text-lg" />
+        </div>
+        <span className="font-extrabold text-xl tracking-tight">Apex</span>
       </Link>
 
-      {/* Nav links — reactive based on auth state */}
-      <div className="apex-nav-links">
-        <Link href="/">Home</Link>
-        <Link href="/about">About</Link>
+      {/* Nav links */}
+      <div className="flex items-center gap-6">
+        <Link href="/" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors hidden sm:block">Home</Link>
+        <Link href="/about" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors hidden sm:block">About</Link>
 
         {isLoggedIn ? (
           <>
-            {/* Logged-in links */}
-            <Link href="/dashboard">Plan Trip</Link>
-
-            {/* Divider — thin but mighty */}
-            <div style={{ width: "1px", height: "20px", background: "#d4e4d4", margin: "0 0.25rem" }} />
-
-            {/* Profile icon — shows Google avatar if available */}
+            <Link href="/dashboard" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Plan Trip</Link>
+            
+            <div className="w-px h-6 bg-slate-200" />
+            
             <Link
               href="/profile"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: "#d1f0b1",
-                color: "#2a5a2a",
-                textDecoration: "none",
-                transition: "all 0.2s",
-                overflow: "hidden",
-              }}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 border border-slate-200 overflow-hidden hover:ring-2 hover:ring-indigo-100 transition-all"
               title={session?.user?.name || "Profile"}
             >
               {session?.user?.image ? (
-                <img
-                  src={session.user.image}
-                  alt=""
-                  style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }}
-                />
+                <img src={session.user.image} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <i className="pi pi-user" style={{ fontSize: "1rem" }} />
+                <i className="pi pi-user text-slate-500" />
               )}
             </Link>
 
-            {/* Sign Out — neutral but clear, like a polite eviction notice */}
             <button
               onClick={handleSignOut}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                padding: "0.45rem 1rem",
-                borderRadius: "10px",
-                background: "transparent",
-                color: "#5a6b5a",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                border: "1.5px solid #d4e4d4",
-                cursor: "pointer",
-                transition: "all 0.2s",
-                fontFamily: "inherit",
-              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition-colors"
             >
-              <i className="pi pi-sign-out" style={{ fontSize: "0.8rem" }} />
-              Sign Out
+              <i className="pi pi-sign-out text-xs" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </>
         ) : (
           <>
-            {/* Logged-out — single Login button */}
-
-            {/* Divider */}
-            <div style={{ width: "1px", height: "20px", background: "#d4e4d4", margin: "0 0.25rem" }} />
-
-            {/* Login — Sky Blue, the one and only entry point */}
+            <div className="w-px h-6 bg-slate-200 hidden sm:block" />
             <Link
               href="/login"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                padding: "0.45rem 1.1rem",
-                borderRadius: "10px",
-                background: "#7ec8e3",
-                color: "#fff",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-                textDecoration: "none",
-                transition: "all 0.2s",
-              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shadow-sm transition-colors"
             >
-              <i className="pi pi-sign-in" style={{ fontSize: "0.85rem" }} />
+              <i className="pi pi-sign-in text-xs" />
               Login
             </Link>
           </>

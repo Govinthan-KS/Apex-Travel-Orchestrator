@@ -1,21 +1,8 @@
-/*
- * Login Page — login/page.tsx
- * ============================
- * The velvet rope of the Apex Travel club.
- *
- * V2.2 — FIXES:
- *   - Google signIn now passes `prompt: "select_account"` as the 3rd
- *     argument to force the Google account picker. Previously it was
- *     only in the provider config which wasn't working reliably.
- *   - Unauthorized toast uses ?unauthorized=1 param detection
- */
-
 "use client";
 
 import { useEffect, useRef, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Button } from "primereact/button";
 import { useApexToast } from "@/components/ToastProvider";
 
 function LoginContent() {
@@ -23,10 +10,6 @@ function LoginContent() {
   const { showWarn } = useApexToast();
   const hasShownToast = useRef(false);
 
-  /*
-   * Unauthorized access toast — only fires when the middleware
-   * bouncer redirected the user here with ?unauthorized=1.
-   */
   useEffect(() => {
     if (hasShownToast.current) return;
 
@@ -40,93 +23,45 @@ function LoginContent() {
     }
   }, [searchParams, showWarn]);
 
-  /*
-   * Google Sign-In handler.
-   *
-   * THE FIX: The 3rd argument `{ prompt: "select_account" }` forces
-   * Google to show the account picker every time. Without this,
-   * Google caches the last signed-in account and silently reuses it
-   * even after the user logged out. The "ghost account" bug.
-   *
-   * The 2nd argument is the NextAuth options (callbackUrl).
-   * The 3rd argument is passed as authorization params to Google's OAuth.
-   */
   const handleGoogleSignIn = () => {
     signIn("google", { callbackUrl: "/dashboard" }, { prompt: "select_account" });
   };
 
   return (
-    <main
-      className="flex align-items-center justify-content-center"
-      style={{
-        minHeight: "calc(100vh - 56px)",
-        padding: "2rem",
-        background: "linear-gradient(135deg, #f8fdf4 0%, #e8f8d8 40%, #c4e8f5 100%)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 440,
-          width: "100%",
-          borderRadius: "20px",
-          border: "2px solid #d1f0b140",
-          background: "rgba(255, 255, 255, 0.9)",
-          backdropFilter: "blur(14px)",
-          boxShadow: "0 8px 40px rgba(126, 200, 227, 0.15)",
-          padding: "3rem 2.5rem",
-          textAlign: "center",
-        }}
-      >
-        {/* ── Logo ── */}
-        <div
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, #7ec8e3, #a3d980)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 1.5rem",
-            boxShadow: "0 4px 20px rgba(126, 200, 227, 0.35)",
-          }}
-        >
-          <i className="pi pi-globe" style={{ fontSize: "2rem", color: "#ffffff" }} />
+    <main className="min-h-[calc(100vh-73px)] flex items-center justify-center p-6 bg-slate-50">
+      <div className="max-w-md w-full bg-white rounded-3xl p-10 shadow-xl border border-slate-200 text-center relative overflow-hidden">
+        {/* Decorative background blob */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-60 pointer-events-none" />
+
+        <div className="relative z-10">
+          {/* Logo */}
+          <div className="w-20 h-20 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-200">
+            <i className="pi pi-globe text-3xl text-white" />
+          </div>
+
+          <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
+            Welcome Back
+          </h1>
+          <p className="text-slate-500 mb-8 font-medium">
+            Sign in to start planning your next adventure
+          </p>
+
+          <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8" />
+
+          {/* Google Sign-In */}
+          <button
+            onClick={handleGoogleSignIn}
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95"
+          >
+            <i className="pi pi-google" />
+            Sign in with Google
+          </button>
+
+          <p className="text-slate-400 text-sm mt-8 leading-relaxed">
+            By signing in you agree to let our AI agents <br /> orchestrate your travel dreams.
+          </p>
         </div>
-
-        <h1 style={{ fontSize: "2rem", fontWeight: 800, color: "#1a2e1a", margin: 0 }}>
-          Welcome Back
-        </h1>
-        <p style={{ color: "#5a6b5a", fontSize: "1rem", marginTop: "0.5rem", marginBottom: "2rem" }}>
-          Sign in to start planning your next adventure
-        </p>
-
-        {/* ── Lime divider ── */}
-        <div style={{ width: "100%", height: 1, background: "linear-gradient(90deg, transparent, #d1f0b1, transparent)", marginBottom: "2rem" }} />
-
-        {/* ── Google Sign-In — forces account picker via 3rd arg ── */}
-        <Button
-          label="Sign in with Google"
-          icon="pi pi-google"
-          size="large"
-          className="w-full"
-          onClick={handleGoogleSignIn}
-          style={{
-            padding: "1rem 1.5rem",
-            fontSize: "1.1rem",
-            background: "linear-gradient(135deg, #7ec8e3, #5bb8d9)",
-            borderColor: "transparent",
-            borderRadius: "12px",
-            fontWeight: 700,
-            boxShadow: "0 4px 16px rgba(126, 200, 227, 0.35)",
-          }}
-        />
-
-        <p style={{ color: "#8a9b8a", fontSize: "0.8rem", marginTop: "1.5rem", lineHeight: 1.5 }}>
-          By signing in you agree to let four AI agents
-          <br />
-          orchestrate your travel dreams.
-        </p>
       </div>
     </main>
   );
@@ -134,7 +69,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div style={{ textAlign: "center", padding: "2rem" }}>Loading...</div>}>
+    <Suspense fallback={<div className="text-center p-8 text-slate-500">Loading...</div>}>
       <LoginContent />
     </Suspense>
   );
