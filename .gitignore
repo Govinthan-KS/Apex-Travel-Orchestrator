@@ -1,7 +1,23 @@
 
-# This contains your Groq, Aviationstack, and OpenTripMap keys.
-# DO NOT let this touch GitHub or the internet will steal your credits.
+# ── Environment Files ──────────────────────────────────────────
+# NEVER commit real credentials. Use .env.example files as templates.
+#
+# Backend secrets (Groq, AviationStack, Pinecone, HuggingFace, Tavily, HMAC)
 .env
+backend/.env
+# Allow example templates — they contain no real secrets
+!.env.example
+!backend/.env.example
+
+# Frontend secrets (MongoDB URI, Google OAuth, AUTH_SECRET, HMAC, backend URL)
+# .env.local is Next.js's convention for local-only env files.
+# The generic .env rule above does NOT cover .env.local (different filename).
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+frontend/.env.local
 
 # THE 'DEPENDENCY HELL' BUFFER
 # We don't upload the virtual environment because it's massive.

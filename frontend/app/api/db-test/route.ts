@@ -1,37 +1,18 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/mongodb";
 
 /**
- * GET /api/db-test
+ * This debug endpoint has been permanently removed.
  *
- * Temporary route to verify MongoDB connectivity.
- * Returns the connection state and host info on success.
+ * It previously returned MongoDB host and database name to unauthenticated
+ * callers, which is an information disclosure vulnerability. Do not restore it.
+ *
+ * If you need to verify database connectivity during development, add
+ * authentication or use a local script that never reaches the public internet.
+ *
+ * To fully remove this file, run:
+ *   Remove-Item -Recurse -Force frontend/app/api/db-test
  */
 export async function GET() {
-  try {
-    const mongoose = await dbConnect();
-
-    return NextResponse.json(
-      {
-        status: "ok",
-        message: "✅ Connection Successful",
-        host: mongoose.connection.host,
-        database: mongoose.connection.name,
-        readyState: mongoose.connection.readyState, // 1 = connected
-      },
-      { status: 200 }
-    );
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
-
-    return NextResponse.json(
-      {
-        status: "error",
-        message: "❌ Connection Failed",
-        error: message,
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
 }
+
