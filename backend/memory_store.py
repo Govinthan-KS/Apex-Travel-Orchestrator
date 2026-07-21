@@ -77,6 +77,10 @@ def _vectorize(text: str) -> list[float]:
             model=EMBEDDING_MODEL_NAME,
             inputs=text
         )
+        # HuggingFace Inference API sometimes returns shape [[float, ...]] (batch of 1)
+        # instead of [float, ...]. Pinecone requires a flat list, so unwrap if needed.
+        if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):
+            embedding = embedding[0]
         return embedding
     except Exception as e:
         logger.error("Error calling Hugging Face Inference API: %s", str(e))
@@ -101,6 +105,11 @@ def upsert_user_vibe(user_id: str, text_description: str) -> dict:
     """
     vector = _vectorize(text_description)
     vector_id = f"vibe-{uuid.uuid4().hex[:12]}"
+
+    logger.debug(
+        "Upserting vibe for user %s — embedding dim: %d",
+        user_id, len(vector),
+    )
 
     index = _get_pinecone_index()
     index.upsert(
@@ -148,10 +157,14 @@ def retrieve_relevant_vibes(
     )
 
     vibes = []
-    for match in results.get("matches", []):
-        text = match.get("metadata", {}).get("text", "")
-        score = match.get("score", 0)
-        if text:
+    # results is a Pinecone QueryResponse object (SDK v3+), not a dict.
+    # Use attribute access (.matches), not .get("matches") which returns None.
+    for match in results.matches:
+        text = match.metadata.get("text", "") if match.metadata else ""
+        score = match.score or 0
+        # Only include memories with meaningful semantic similarity.
+        # A score below 0.6 is likely noise, not a relevant past experience.
+        if text and score >= 0.6:
             vibes.append(text)
             logger.debug("  vibe (%.3f): %s", score, text[:80])
 

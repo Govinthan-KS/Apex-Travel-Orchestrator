@@ -233,7 +233,30 @@ export default function DashboardPage() {
         }];
       }
       setEvents(parsed);
+
+      // ── Memory Pipeline: store this trip as a semantic memory ──────────────
+      // Fire-and-forget — a Pinecone or HuggingFace failure must not affect
+      // the user-facing result. The vibe text is what gets embedded and stored.
+      const vibeText = [
+        `Planned a trip to ${destination}`,
+        `$${budget} total budget`,
+        startDate && endDate ? `${Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1} days` : "3 days",
+        `${pace} pace`,
+        selectedInterests.length > 0 ? `interests: ${selectedInterests.join(", ")}` : null,
+      ].filter(Boolean).join(", ");
+
+      fetch(`${BACKEND_URL}/api/v2/sync-vibe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: dna.user_id,
+          vibe_text: vibeText,
+        }),
+      }).catch((e) => console.error("sync-vibe failed (non-blocking):", e));
+      // ── End Memory Pipeline ────────────────────────────────────────────────
+
       showSuccess("Trip Planned", "Your itinerary has been successfully generated!");
+
     } catch (err) {
       showError("Planning Failed", err instanceof Error ? err.message : "Something broke. Please try again.");
     } finally {
