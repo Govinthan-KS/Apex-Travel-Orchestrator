@@ -207,29 +207,23 @@ export default function DashboardPage() {
         parsed = JSON.parse(raw);
 
         if (parsed.length > 0) {
-          const summary = parsed[parsed.length - 1];
-          let totalCost = 0;
-          if (summary && summary.description) {
-            const match = summary.description.match(/\$(\d+(?:,\d+)?)/);
-            if (match) {
-               totalCost = parseInt(match[1].replace(/,/g, ""), 10);
-            }
+          // Save the trip unconditionally after a successful parse.
+          // The previous heuristic (regex-extracting a cost and comparing to budget)
+          // silently blocked saves whenever the LLM wrote "USD 1,200", "$800–$1,200",
+          // or any other format. A successfully generated itinerary is always worth saving.
+          let days = 3;
+          if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
           }
-
-          if (totalCost > 0 && totalCost <= budget + 150) {
-            let days = 3;
-            if (startDate && endDate) {
-              const start = new Date(startDate);
-              const end = new Date(endDate);
-              days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-            }
-            fetch("/api/trips", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ destination, budget, days, itinerary: parsed })
-            }).catch(console.error);
-          }
+          fetch("/api/trips", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ destination, budget, days, itinerary: parsed })
+          }).catch(console.error);
         }
+
       } catch {
         parsed = [{
           status: "Your Itinerary",

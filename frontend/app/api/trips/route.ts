@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       destination: data.destination,
       budget: data.budget,
       days: data.days,
-      date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }), // e.g. "March 2026"
+      date: new Date(), // stored as native Date; format at render time
       itinerary: data.itinerary,
     });
 

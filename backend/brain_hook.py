@@ -50,7 +50,15 @@ def get_augmented_context(
         hub_city = IATA_TO_CITY.get(hub_code, hub_code)
         
         sections.append(f"Home Hub: {hub_city}")
-        sections.append(f"Dietary: {constraints.get('dietary', 'none')}")
+        # dietary is expected as a plain string ("vegetarian", "none", etc.).
+        # Guard against the old frontend bug that sent it as an array (["vegetarian"]).
+        dietary_raw = constraints.get('dietary', 'none')
+        if isinstance(dietary_raw, list):
+            dietary = dietary_raw[0] if dietary_raw else 'none'
+        else:
+            dietary = dietary_raw or 'none'
+        sections.append(f"Dietary: {dietary}")
+
         sections.append(f"Accessibility: {', '.join(constraints.get('accessibility', [])) or 'None'}")
         sections.append(f"Travel Pace: {constraints.get('travel_pace', 'moderate')}")
         sections.append("")

@@ -6,7 +6,7 @@ export interface ITrip extends Document {
   destination: string;
   budget: number;
   days: number;
-  date: string; // E.g., "March 2026"
+  date: Date; // When the trip was planned (stored as native Date, formatted at render time)
   itinerary: any[]; // The parsed JSON array of the timeline events
   createdAt: Date;
   updatedAt: Date;
@@ -35,8 +35,9 @@ const TripSchema = new Schema<ITrip>(
       required: true,
     },
     date: {
-      type: String,
+      type: Date,
       required: true,
+      default: Date.now,
     },
     itinerary: {
       type: Schema.Types.Mixed, // Stores the array of timeline events

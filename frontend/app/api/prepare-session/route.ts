@@ -74,7 +74,9 @@ export async function GET() {
     const logisticsDna = {
       user_id: userId,
       constraints: {
-        dietary: survey.dietary ? [survey.dietary] : [],
+        // Send dietary as a plain string — the Python backend reads it with
+        // constraints.get('dietary', 'none') which expects a string, not an array.
+        dietary: survey.dietary ?? "none",
         home_hub: survey.homeHub,
         accessibility: survey.accessibility ?? [],
         travel_pace: survey.travelPace ?? "moderate",
@@ -95,9 +97,8 @@ export async function GET() {
     let signature = "";
 
     if (sharedSecret) {
-      // Canonical JSON: sorted keys, no whitespace — matches Python's json.dumps(sort_keys=True, separators=(",",":"))
-      const canonical = JSON.stringify(logisticsDna, Object.keys(logisticsDna).sort());
-      // For deterministic output matching Python, use a stable serializer
+      // Stable JSON: recursively sorted keys, no whitespace.
+      // Matches Python's json.dumps(sort_keys=True, separators=(",",":")).
       const stableCanonical = stableStringify(logisticsDna);
       signature = crypto
         .createHmac("sha256", sharedSecret)
