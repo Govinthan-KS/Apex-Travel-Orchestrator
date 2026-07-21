@@ -250,7 +250,11 @@ Thought: {{agent_scratchpad}}"""
         tools=tools,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=8,
+        # Budget validation (rule 5) may require re-consulting a specialist,
+        # which adds up to 3 extra iterations. 12 covers the full happy path
+        # (3 specialists × up to 2 calls each) plus synthesis without being unbounded.
+        max_iterations=12,
+
     )
 
     try:

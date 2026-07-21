@@ -73,7 +73,7 @@ def run_flight_agent(query: str) -> str:
 
     Follow this format STRICTLY:
     Thought: I need to extract the travel details from the DNA-enriched request.
-    Action: [{tool_names}]
+    Action: (one of: {tool_names})
     Action Input: {{"parameter": "your valid JSON input here"}}
     Observation: the result of the action
     Thought: (if search_flights found nothing, I will use web_search_flights as fallback)
@@ -105,7 +105,11 @@ def run_flight_agent(query: str) -> str:
     try:
         result = agent_executor.invoke({"input": query})
         return result["output"]
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(
+            "Flight agent failed for query '%s': %s", query[:80], e, exc_info=True
+        )
         return "I encountered an error while searching for flights. Please check the schedule manually."
 
 

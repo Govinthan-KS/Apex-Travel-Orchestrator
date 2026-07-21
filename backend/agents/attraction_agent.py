@@ -52,7 +52,6 @@ def run_attraction_agent(query: str) -> str:
        - "moderate": Recommend 3-4 attractions per day.
        - "intensive": Recommend 5+ attractions per day.
     5. Once you see the 'Observation', immediately provide your 'Final Answer'.
-    5. Once you see the 'Observation', immediately provide your 'Final Answer'.
     6. FORMAT GUARD: NEVER use "Action: None". If you have the data, you MUST use "Final Answer:" immediately.
     7. Do NOT repeat thoughts or actions.
     8. Do NOT use emojis.
@@ -84,7 +83,11 @@ def run_attraction_agent(query: str) -> str:
     try:
         result = agent_executor.invoke({"input": query})
         return result["output"]
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(
+            "Attraction agent failed for query '%s': %s", query[:80], e, exc_info=True
+        )
         return "I encountered an issue retrieving attractions for this location. Please explore local landmarks manually."
 
 

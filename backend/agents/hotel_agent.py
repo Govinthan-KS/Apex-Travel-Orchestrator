@@ -53,7 +53,7 @@ def run_hotel_agent(query: str) -> str:
 
     Follow this format:
     Thought: I need to extract the city, budget, and tier from the DNA-enriched request.
-    Action: [{tool_names}]
+    Action: (one of: {tool_names})
     Action Input: City, Budget, Date, StayTier
     Observation: the result of the tool
     Thought: I have the hotel and weather details, filtered by the user's preferred tier.
@@ -78,7 +78,11 @@ def run_hotel_agent(query: str) -> str:
     try:
         result = agent_executor.invoke({"input": query})
         return result["output"]
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(
+            "Hotel agent failed for query '%s': %s", query[:80], e, exc_info=True
+        )
         return "I encountered an issue finding hotels for this location. Please check availability manually."
 
 
