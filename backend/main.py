@@ -140,7 +140,7 @@ async def get_context(req: ContextRequest):
     """
     Get augmented context combining Logistics DNA + Semantic Memories.
 
-    This is the payload injected into the Llama 3.3 70b system prompt
+    This is the payload injected into the coordinator's system prompt
     for personalized travel recommendations.
     """
     if not req.user_id or not req.query.strip():

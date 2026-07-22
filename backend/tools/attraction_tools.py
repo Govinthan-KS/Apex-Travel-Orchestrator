@@ -65,7 +65,7 @@ def search_attractions(city: str) -> str:
             return f"No attractions found in {city}. Maybe it's a very peaceful, empty field?"
 
         # Turning the JSON list into something that doesn't look like a computer threw up.
-        attractions = [f"🏛️ Top sights in {city.title()}:"]
+        attractions = [f"Top sights in {city.title()}:"]
         for place in data:
             name = place.get("name", "Mysterious Landmark")
             # If the place has no name, it's probably not worth the bus fare.

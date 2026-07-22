@@ -18,7 +18,7 @@ V2.1 — Tavily Web Search Fallback:
 
 import requests
 import logging
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from langchain.tools import tool
 from rapidfuzz import process, fuzz
 from config import AVIATIONSTACK_API_KEY, TAVILY_API_KEY, MAX_RESULTS

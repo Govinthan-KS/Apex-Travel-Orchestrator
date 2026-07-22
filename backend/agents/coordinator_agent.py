@@ -20,7 +20,7 @@ Architecture (v2.1 — Parallel Execution):
 
   Model split:
     Coordinator phases 1 & 3: compound-beta on Groq (70K TPM, no daily cap)
-    Sub-agents: gemini-2.0-flash on Google (1M TPM, separate rate limits)
+    Sub-agents: gemini-3.5-flash-lite on Google AI Studio (separate rate limits)
 """
 
 import json
