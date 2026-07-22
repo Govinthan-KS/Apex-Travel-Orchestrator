@@ -13,13 +13,19 @@ Upgraded from V1:
   - Reads preferred flight_class from the Coordinator's delegation
   - Two tools: search_flights (primary) and web_search_flights (fallback)
   - NEVER returns 'Action: None' and NEVER repeats a failed search
+
+Provider: Google Gemini Flash — separate rate limit bucket from Groq coordinator,
+1M TPM on free tier, superior tool-calling reliability.
 """
 
+import logging
 from langchain_core.prompts import PromptTemplate
 from langchain.agents import AgentExecutor, create_react_agent
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tools.flight_tools import search_flights, web_search_flights
-from config import GROQ_API_KEY, MODEL_NAME, TEMPERATURE
+from config import GOOGLE_API_KEY, SUB_AGENT_MODEL, TEMPERATURE
+
+logger = logging.getLogger(__name__)
 
 
 def run_flight_agent(query: str) -> str:
@@ -33,9 +39,9 @@ def run_flight_agent(query: str) -> str:
     If the primary API returns nothing, the agent automatically
     falls back to web search. No more infinite loops. No more demons.
     """
-    llm = ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_NAME,
+    llm = ChatGoogleGenerativeAI(
+        model=SUB_AGENT_MODEL,
+        google_api_key=GOOGLE_API_KEY,
         temperature=TEMPERATURE,
     )
 
@@ -77,7 +83,7 @@ def run_flight_agent(query: str) -> str:
     Action Input: {{"parameter": "your valid JSON input here"}}
     Observation: the result of the action
     Thought: (if search_flights found nothing, I will use web_search_flights as fallback)
-    Action: [{tool_names}]
+    Action: (one of: {tool_names})
     Action Input: your fallback query (JSON)
     Observation: the fallback result
     Thought: I have enough data to compile a flight report.
@@ -96,9 +102,7 @@ def run_flight_agent(query: str) -> str:
         tools=tools,
         verbose=True,
         handle_parsing_errors=True,
-        # Stopping the infinite loop before it summons a demon in the server room.
-        # 4 iterations is enough: primary search + fallback + synthesis.
-        # If you need more than 4, something is very wrong.
+        # 4 iterations: primary search + fallback + synthesis.
         max_iterations=4,
     )
 
@@ -106,8 +110,7 @@ def run_flight_agent(query: str) -> str:
         result = agent_executor.invoke({"input": query})
         return result["output"]
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(
+        logger.error(
             "Flight agent failed for query '%s': %s", query[:80], e, exc_info=True
         )
         return "I encountered an error while searching for flights. Please check the schedule manually."

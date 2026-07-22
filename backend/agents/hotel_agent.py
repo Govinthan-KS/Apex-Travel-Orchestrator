@@ -5,13 +5,19 @@ Upgraded from V1 to ingest User DNA context:
   - Tier-based filtering: prioritizes hotels matching user's stay_tier
   - Dietary awareness: notes dietary constraints in search context
   - Reads stay_tier from the Coordinator's delegation
+
+Provider: Google Gemini Flash — separate rate limit bucket from Groq coordinator,
+1M TPM on free tier, superior tool-calling reliability.
 """
 
+import logging
 from langchain_core.prompts import PromptTemplate
 from langchain.agents import AgentExecutor, create_react_agent
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tools.hotel_tools import search_hotels
-from config import GROQ_API_KEY, MODEL_NAME, TEMPERATURE
+from config import GOOGLE_API_KEY, SUB_AGENT_MODEL, TEMPERATURE
+
+logger = logging.getLogger(__name__)
 
 
 def run_hotel_agent(query: str) -> str:
@@ -22,9 +28,9 @@ def run_hotel_agent(query: str) -> str:
       "Hotels in Tokyo under $200, preferred tier: mid_range,
        dietary: vegan, pace: moderate"
     """
-    llm = ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_NAME,
+    llm = ChatGoogleGenerativeAI(
+        model=SUB_AGENT_MODEL,
+        google_api_key=GOOGLE_API_KEY,
         temperature=TEMPERATURE,
     )
 
@@ -79,8 +85,7 @@ def run_hotel_agent(query: str) -> str:
         result = agent_executor.invoke({"input": query})
         return result["output"]
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(
+        logger.error(
             "Hotel agent failed for query '%s': %s", query[:80], e, exc_info=True
         )
         return "I encountered an issue finding hotels for this location. Please check availability manually."

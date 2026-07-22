@@ -1,49 +1,54 @@
 """
 Apex Travel Orchestrator v2 — Context-Aware Strategic Orchestrator
 
-The Coordinator is no longer a stateless CEO. It is a Strategic Orchestrator
-that injects the user's Logistics DNA (Hard Constraints from MongoDB) and
-Semantic Memories (Soft Preferences from Pinecone) into every planning cycle.
+Architecture (v2.1 — Parallel Execution):
+  The coordinator no longer uses a ReAct loop for specialist delegation.
+  ReAct is inherently sequential (each Action waits for its Observation).
+  Parallel execution requires knowing all queries upfront.
 
-Architecture:
-  1. _get_user_context(user_id, query, dna)  → formats DNA + vibes as XML blocks
-  2. run_coordinator_agent(user_id, user_query, dna) → injects context into the system prompt
-  3. Sub-agents receive constraint-prefixed delegations from the Coordinator
+  New two-phase approach:
+    Phase 1: One LLM call (compound-beta) parses the user query + DNA
+             and builds three specialist-specific query strings as JSON.
+    Phase 2: All three specialist agents run simultaneously via
+             ThreadPoolExecutor. Wall time = max(agents), not sum(agents).
+    Phase 3: One LLM call (compound-beta) synthesizes the three reports
+             into the final JSON itinerary.
+
+  Graceful degradation: if a specialist fails, its result is replaced
+  with a placeholder string. The synthesizer still produces a partial
+  itinerary rather than returning an error.
+
+  Model split:
+    Coordinator phases 1 & 3: compound-beta on Groq (70K TPM, no daily cap)
+    Sub-agents: gemini-2.0-flash on Google (1M TPM, separate rate limits)
 """
 
+import json
 import logging
-from langchain.tools import tool
-from langchain_core.prompts import PromptTemplate
-from langchain.agents import AgentExecutor, create_react_agent
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage
 
 from agents.flight_agent import run_flight_agent
 from agents.hotel_agent import run_hotel_agent
 from agents.attraction_agent import run_attraction_agent
 from brain_hook import get_augmented_context
-from config import GROQ_API_KEY, MODEL_NAME
+from config import GROQ_API_KEY, COORDINATOR_MODEL
 
 logger = logging.getLogger(__name__)
 
-# Context Injection — The "Brain" of V2
+
+# ── Context Assembly ──────────────────────────────────────────────────────────
 
 def _get_user_context(user_id: str, query: str, dna: dict | None = None) -> str:
     """
     Format the user's Logistics DNA and Semantic Memories
     into clean XML blocks for the LLM system prompt.
-
-    Args:
-        user_id: The authenticated user's MongoDB ID.
-        query:   The current travel query (used for semantic search).
-        dna:     Logistics DNA dict from frontend /api/prepare-session (or None).
-
-    Returns:
-        A formatted string with <user_dna> and <past_memories> blocks.
     """
-    # Use brain_hook to build the augmented context
     raw_context = get_augmented_context(user_id, query, dna=dna, top_k=3)
 
-    # Parse the raw context into XML blocks for the LLM
     sections = []
 
     # Extract DNA lines
@@ -59,15 +64,13 @@ def _get_user_context(user_id: str, query: str, dna: dict | None = None) -> str:
         if in_dna and line.strip():
             dna_lines.append(line.strip())
 
+    sections.append("<user_dna>")
     if dna_lines:
-        sections.append("<user_dna>")
         for line in dna_lines:
             sections.append(f"  {line}")
-        sections.append("</user_dna>")
     else:
-        sections.append("<user_dna>")
         sections.append("  No profile data available. User may not have completed onboarding.")
-        sections.append("</user_dna>")
+    sections.append("</user_dna>")
 
     # Extract memory lines
     memory_lines = []
@@ -91,133 +94,151 @@ def _get_user_context(user_id: str, query: str, dna: dict | None = None) -> str:
     return "\n".join(sections)
 
 
-# Sub-Agent Tool Wrappers
+# ── Helper: Safe Agent Call ───────────────────────────────────────────────────
 
-@tool
-def flight_specialist(query: str) -> str:
-    """Consult the Flight Specialist to find schedules and routes.
-    Input should be a natural language request that includes the user's Home Hub
-    and any constraints, like 'Flights from MAA (user home hub) to Tokyo on May 20,
-    preferred class: premium_economy'."""
-    return run_flight_agent(query)
-
-
-@tool
-def hotel_specialist(query: str) -> str:
-    """Consult the Hotel Specialist to find accommodations within a budget.
-    Input should include the user's stay tier preference and dietary needs,
-    like 'Hotels in Tokyo under $200, preferred tier: mid_range, dietary: vegan'."""
-    return run_hotel_agent(query)
-
-
-@tool
-def attraction_specialist(query: str) -> str:
-    """Consult the Attractions Specialist to find things to do.
-    Input should include the user's interests,
-    like 'Attractions in Tokyo, interests: culture, food, nightlife'."""
-    return run_attraction_agent(query)
-
-# The Strategic Orchestrator
-
-def run_coordinator_agent(user_id: str, user_query: str, dna: dict | None = None) -> str:
+def _safe_agent_call(agent_fn, query: str, agent_name: str) -> str:
     """
-    The Context-Aware Strategic Orchestrator.
-
-    Injects the user's Logistics DNA and Semantic Memories into the system
-    prompt, then delegates to sub-agents with constraint-aware instructions.
-
-    Args:
-        user_id:    The authenticated user's MongoDB ID (for context lookup).
-        user_query: The natural language travel request.
-        dna:        Logistics DNA dict from the frontend (or None).
-
-    Returns:
-        A professional, personalized day-by-day itinerary.
+    Call a specialist agent and return its result, or a placeholder on failure.
+    Used inside ThreadPoolExecutor so failures are caught per-agent.
     """
-    # ── 1. Fetch user context ──
-    logger.info("Building context for user %s | query: '%s'", user_id, user_query[:60])
-    user_context = _get_user_context(user_id, user_query, dna=dna)
-    logger.info("Context injected:\n%s", user_context)
+    try:
+        result = agent_fn(query)
+        logger.info("%s completed successfully.", agent_name)
+        return result
+    except Exception as e:
+        logger.error("%s failed for query '%s': %s", agent_name, query[:80], e, exc_info=True)
+        return f"[{agent_name} data unavailable — advise user to check manually. Error: {type(e).__name__}]"
 
-    # ── 2. Initialize LLM ──
-    llm = ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_NAME,
-        temperature=0.1,
-    )
 
-    # ── 3. Tool registry ──
-    tools = [flight_specialist, hotel_specialist, attraction_specialist]
+# ── Helper: Extract JSON from LLM response ────────────────────────────────────
 
-    # ── 4. The V2 System Prompt ──
-    template = f"""You are the Strategic Orchestrator of the Apex Travel Agency v2.
-Your mission is to coordinate three specialists to build a PERSONALIZED, high-quality
-itinerary that strictly honors the user's profile and preferences.
+def _extract_json(text: str) -> dict:
+    """
+    Extract a JSON object from an LLM response that may contain
+    surrounding prose or markdown code fences.
+    """
+    # Strip markdown code fences
+    text = re.sub(r"```(?:json)?\s*", "", text).strip()
+    # Find the first { ... } block
+    match = re.search(r"\{[\s\S]*\}", text)
+    if match:
+        return json.loads(match.group(0))
+    raise ValueError(f"No JSON object found in LLM response: {text[:200]}")
 
---- INJECTED USER CONTEXT ---
+
+# ── Phase 1: Build Specialist Queries ────────────────────────────────────────
+
+_PHASE1_SYSTEM = """\
+You are a travel planning coordinator. Given a user's travel request and their profile,
+output ONLY a valid JSON object with three specialist query strings.
+Do not include any explanation or markdown — output raw JSON only.
+
+Required format:
+{
+  "flight_query": "Specific query for the flight specialist including departure hub, destination, date, preferred class",
+  "hotel_query": "Specific query for the hotel specialist including city, budget per night, dates, preferred tier, dietary needs",
+  "attraction_query": "Specific query for the attraction specialist including city, user interests, travel pace"
+}
+
+Rules:
+- Use the user's Home Hub from their DNA as the departure airport.
+- Distribute the total budget sensibly across flights and hotels.
+- Include all relevant DNA constraints in each query.
+- Use today's date context for scheduling if no dates are specified.
+- If no dates are given, assume a trip starting within the next 2 weeks.
+"""
+
+def _build_specialist_queries(
+    llm: ChatGroq,
+    user_query: str,
+    user_context: str,
+) -> dict:
+    """
+    Phase 1: One LLM call that returns all three specialist queries as JSON.
+    """
+    prompt = f"""{_PHASE1_SYSTEM}
+
+User Profile:
 {user_context}
---- END CONTEXT ---
 
-CRITICAL RULES — READ CAREFULLY:
-1. HONOR THE DNA: You must strictly adhere to the <user_dna> (Hard Constraints).
-   - ALWAYS use the user's Home Hub as the departure airport.
-   - ALWAYS respect dietary restrictions when recommending food or hotels.
-   - ALWAYS consider accessibility needs in activity recommendations.
-   - ALWAYS match the user's Travel Pace (relaxed/moderate/intensive).
+User Request: {user_query}
+"""
+    logger.info("Phase 1: Building specialist queries for: '%s'", user_query[:60])
+    response = llm.invoke([HumanMessage(content=prompt)])
+    queries = _extract_json(response.content)
 
-2. PRIORITIZE MEMORIES: Use the <past_memories> (Soft Preferences) to personalize.
-   - If the user has expressed preferences before, incorporate them naturally.
-   - Weight recommendations toward their stated interests.
+    required_keys = {"flight_query", "hotel_query", "attraction_query"}
+    missing = required_keys - set(queries.keys())
+    if missing:
+        raise ValueError(f"Phase 1 response missing keys: {missing}")
 
-3. CONSTRAINT-AWARE DELEGATION: Every request to a sub-agent MUST be prefixed
-   with the relevant user constraints. For example:
-   - Flight: "Find flights from [Home Hub] to [destination], preferred class: [flight_class]"
-   - Hotel: "Hotels in [city] under $[budget], preferred tier: [stay_tier], dietary: [dietary]"
-   - Attraction: "Attractions in [city], interests: [interest1, interest2], pace: [travel_pace]"
+    logger.info(
+        "Phase 1 complete. Queries: flight='%s...', hotel='%s...', attractions='%s...'",
+        queries["flight_query"][:50],
+        queries["hotel_query"][:50],
+        queries["attraction_query"][:50],
+    )
+    return queries
 
-4. SAFETY VALVE — Stopping the infinite loop before it summons a demon in the server room:
-   - If a specialist fails TWICE (returns errors or "No flights/hotels found"), do NOT
-     call them a third time with the same query. We pivot, we don't repeat.
-   - Instead, instruct the specialist to provide a "Logical Estimate" based on
-     web search data so the itinerary can proceed.
-   - If even the web search fails, YOU must provide a reasonable estimate yourself
-     using your knowledge of typical routes and prices for the city pair.
-   - NEVER get stuck in a loop calling the same specialist with the same failed query.
 
-5. BUDGET VALIDATION STEP: Before returning your Final Answer, you MUST sum up the estimated costs.
-   - Compare the total against the user's budget (provided in the User Request).
-   - If the total exceeds the budget, you MUST consult the Hotel or Flight specialist again to ask for a cheaper alternative (e.g. "budget" tier hotels instead of "mid_range") until it fits.
+# ── Phase 2: Parallel Specialist Execution ────────────────────────────────────
 
-6. SYNTHESIS PROTOCOL (CRITICAL!):
-   - When you have 3 reports and are ready to compile the itinerary, DO NOT brainstorm or write math out loud.
-   - DO NOT write multiple "Thought:" lines.
-   - NEVER use "Action: None". Just write one "Thought:" and immediately output your "Final Answer: " JSON array.
-7. NO EMOJIS: Keep the output professional and text-only.
-8. AVOID 'Action: Final Answer': When you are ready to deliver the final itinerary, do NOT write 'Action: Final Answer'. Just write 'Final Answer: ' followed immediately by the JSON array.
+def _run_specialists_in_parallel(queries: dict) -> dict:
+    """
+    Phase 2: Dispatch all three specialist agents simultaneously.
+    Returns results dict with keys: flight, hotel, attraction.
+    Failed agents return placeholder strings (graceful degradation).
+    """
+    logger.info("Phase 2: Dispatching all 3 specialists in parallel...")
 
-You have access to:
-{{tools}}
+    agent_tasks = {
+        "flight":     (run_flight_agent,     queries["flight_query"],     "Flight Specialist"),
+        "hotel":      (run_hotel_agent,       queries["hotel_query"],      "Hotel Specialist"),
+        "attraction": (run_attraction_agent,  queries["attraction_query"], "Attraction Specialist"),
+    }
 
-Use this format:
-Thought: I need to consult a specialist. I will include the user's constraints.
-Action: one of [{{tool_names}}]
-Action Input: A constraint-prefixed request for the specialist
-Observation: The specialist's report
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I have collected all reports and performed the budget validation. I now know the final answer.
-Final Answer: <YOUR JSON ARRAY HERE>
+    results = {}
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        future_to_key = {
+            executor.submit(_safe_agent_call, fn, q, name): key
+            for key, (fn, q, name) in agent_tasks.items()
+        }
+        for future in as_completed(future_to_key):
+            key = future_to_key[future]
+            results[key] = future.result()  # _safe_agent_call never raises
+
+    logger.info("Phase 2 complete. All specialists finished.")
+    return results
+
+
+# ── Phase 3: Synthesis ────────────────────────────────────────────────────────
+
+_PHASE3_SYSTEM = """\
+You are the Strategic Orchestrator of the Apex Travel Agency v2.
+You have received reports from three specialist agents.
+Your job is to synthesize them into a single, personalized, day-by-day itinerary
+that strictly honors the user's DNA profile and budget.
+
+SYNTHESIS RULES:
+1. HONOR THE DNA: Respect all hard constraints from <user_dna> (dietary, home hub, pace, accessibility).
+2. PRIORITIZE MEMORIES: Use <past_memories> to add personalized touches.
+3. BUDGET VALIDATION: The total cost of flights + hotels must not exceed the user's stated budget.
+   If it does, note this clearly in the Trip Summary and suggest the most practical reduction.
+4. NO EMOJIS. Professional and text-only.
+5. If a specialist returned "[... data unavailable ...]", acknowledge this in the relevant day
+   and advise the user to check manually. Do not hallucinate data.
 
 FINAL ANSWER FORMAT — STRICTLY REQUIRED:
-Your Final Answer MUST be a valid JSON array. Each object MUST follow this exact schema:
-{{{{
+Output ONLY a valid JSON array. Each object MUST follow this exact schema:
+{
   "status": "Activity Name (short title)",
   "date": "Day X - Morning/Afternoon/Evening",
   "icon": "pi pi-<icon-name>",
   "color": "#7ec8e3 or #f7d9d9",
   "description": "Detailed description of the activity"
-}}}}
+}
 
-Use the following PrimeReact icon names:
+PrimeReact icon names to use:
 - Flights: "pi pi-send"
 - Hotels/Check-in: "pi pi-building"
 - Attractions/Sightseeing: "pi pi-map-marker"
@@ -226,40 +247,92 @@ Use the following PrimeReact icon names:
 - Transport: "pi pi-car"
 - Summary/Cost: "pi pi-wallet"
 
-Alternate colors between #7ec8e3 (Sky Blue) and #f7d9d9 (Pale Pink) for visual rhythm.
+Alternate colors between #7ec8e3 (Sky Blue) and #f7d9d9 (Pale Pink).
 
-The LAST object in the array MUST be a cost summary with:
+The LAST object MUST be a cost summary:
   "status": "Trip Summary", "icon": "pi pi-wallet", "color": "#7ec8e3"
 
-Example output structure (your Final Answer must be ONLY the JSON array, no other text):
-[
-  {{{{"status": "Arrival & Check-in", "date": "Day 1 - Morning", "icon": "pi pi-send", "color": "#7ec8e3", "description": "Flight from MAA to NRT..."}}}},
-  {{{{"status": "Temple Visit", "date": "Day 1 - Afternoon", "icon": "pi pi-map-marker", "color": "#f7d9d9", "description": "Visit Senso-ji Temple..."}}}},
-  {{{{"status": "Trip Summary", "date": "Total", "icon": "pi pi-wallet", "color": "#7ec8e3", "description": "Estimated total: $600..."}}}}
-]
+Output ONLY the JSON array — no preamble, no explanation, no markdown fences.
+"""
 
-Begin!
-User Request: {{input}}
-Thought: {{agent_scratchpad}}"""
+def _synthesize_itinerary(
+    llm: ChatGroq,
+    user_query: str,
+    user_context: str,
+    results: dict,
+) -> str:
+    """
+    Phase 3: Synthesize specialist reports into the final JSON itinerary.
+    """
+    prompt = f"""{_PHASE3_SYSTEM}
 
-    prompt = PromptTemplate.from_template(template)
-    agent = create_react_agent(llm, tools, prompt)
+User Profile:
+{user_context}
 
-    agent_executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        # Budget validation (rule 5) may require re-consulting a specialist,
-        # which adds up to 3 extra iterations. 12 covers the full happy path
-        # (3 specialists × up to 2 calls each) plus synthesis without being unbounded.
-        max_iterations=12,
+User Request: {user_query}
 
+--- FLIGHT SPECIALIST REPORT ---
+{results.get("flight", "[Flight data unavailable]")}
+
+--- HOTEL SPECIALIST REPORT ---
+{results.get("hotel", "[Hotel data unavailable]")}
+
+--- ATTRACTIONS SPECIALIST REPORT ---
+{results.get("attraction", "[Attractions data unavailable]")}
+
+Now output the JSON itinerary array:
+"""
+    logger.info("Phase 3: Synthesizing itinerary...")
+    response = llm.invoke([HumanMessage(content=prompt)])
+    logger.info("Phase 3 complete.")
+    return response.content
+
+
+# ── Public Entry Point ────────────────────────────────────────────────────────
+
+def run_coordinator_agent(user_id: str, user_query: str, dna: dict | None = None) -> str:
+    """
+    The Context-Aware Strategic Orchestrator — parallel edition.
+
+    Replaces the sequential ReAct loop with a deterministic two-phase approach:
+      Phase 1 → Phase 2 (parallel specialists) → Phase 3 (synthesis)
+
+    Args:
+        user_id:    The authenticated user's MongoDB ID (for context lookup).
+        user_query: The natural language travel request.
+        dna:        Logistics DNA dict from the frontend (or None).
+
+    Returns:
+        A professional, personalized day-by-day itinerary as a JSON string.
+    """
+    logger.info(
+        "Coordinator starting for user %s | query: '%s'",
+        user_id, user_query[:60],
+    )
+
+    # Build user context (DNA + memories)
+    user_context = _get_user_context(user_id, user_query, dna=dna)
+    logger.info("Context injected:\n%s", user_context)
+
+    # Initialize coordinator LLM (compound-beta: 70K TPM, no daily cap)
+    llm = ChatGroq(
+        groq_api_key=GROQ_API_KEY,
+        model_name=COORDINATOR_MODEL,
+        temperature=0.1,
     )
 
     try:
-        result = agent_executor.invoke({"input": user_query})
-        return result["output"]
+        # Phase 1: Parse query → specialist queries
+        queries = _build_specialist_queries(llm, user_query, user_context)
+
+        # Phase 2: Run all specialists in parallel
+        results = _run_specialists_in_parallel(queries)
+
+        # Phase 3: Synthesize into final itinerary
+        itinerary = _synthesize_itinerary(llm, user_query, user_context, results)
+
+        return itinerary
+
     except Exception as e:
-        logger.error("Coordinator error for user %s: %s", user_id, e)
+        logger.error("Coordinator error for user %s: %s", user_id, e, exc_info=True)
         return f"Coordinator Error: {str(e)}. Please try a simpler request."

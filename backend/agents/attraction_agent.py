@@ -5,13 +5,19 @@ Upgraded from V1 to ingest User DNA context:
   - Interest-based curation: filters and prioritizes attractions by user interests
   - Pace awareness: adjusts number of recommendations by travel pace
   - Reads interests from the Coordinator's delegation
+
+Provider: Google Gemini Flash — separate rate limit bucket from Groq coordinator,
+1M TPM on free tier, superior tool-calling reliability.
 """
 
+import logging
 from langchain_core.prompts import PromptTemplate
 from langchain.agents import AgentExecutor, create_react_agent
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from tools.attraction_tools import search_attractions
-from config import GROQ_API_KEY, MODEL_NAME, TEMPERATURE
+from config import GOOGLE_API_KEY, SUB_AGENT_MODEL, TEMPERATURE
+
+logger = logging.getLogger(__name__)
 
 
 def run_attraction_agent(query: str) -> str:
@@ -22,9 +28,9 @@ def run_attraction_agent(query: str) -> str:
       "Attractions in Tokyo, interests: culture, food, nightlife,
        pace: moderate"
     """
-    llm = ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_NAME,
+    llm = ChatGoogleGenerativeAI(
+        model=SUB_AGENT_MODEL,
+        google_api_key=GOOGLE_API_KEY,
         temperature=TEMPERATURE,
     )
 
@@ -84,8 +90,7 @@ def run_attraction_agent(query: str) -> str:
         result = agent_executor.invoke({"input": query})
         return result["output"]
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(
+        logger.error(
             "Attraction agent failed for query '%s': %s", query[:80], e, exc_info=True
         )
         return "I encountered an issue retrieving attractions for this location. Please explore local landmarks manually."
