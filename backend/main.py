@@ -11,8 +11,13 @@ The original CLI coordinator loop is preserved as a CLI sub-command.
 
 import sys
 import os
+import re
 import logging
 import argparse
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Adding the current directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -38,11 +43,18 @@ logger = logging.getLogger("apex-backend")
 
 # FastAPI App
 
+# Rate Limiter — protects /api/v2/plan from quota drain
+# 5 requests per minute per IP. In-memory (no Redis needed for single-instance).
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
+
 app = FastAPI(
     title="Apex Travel Orchestrator v2 — Backend API",
     description="Semantic memory layer & AI agent orchestration",
     version="2.0.0",
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS — allow the Next.js frontend or a production URL
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -92,6 +104,45 @@ class PlanResponse(BaseModel):
     status: str
     user_id: str
     itinerary: str
+
+# Input Sanitization
+
+_IATA_RE = re.compile(r'^[A-Z]{3}$')
+_CONTROL_CHARS_RE = re.compile(r'[\x00-\x1f\x7f]')
+
+
+def _sanitize_request(req: "PlanRequest") -> None:
+    """
+    Validate and sanitize fields before they reach the coordinator LLM.
+
+    homeHub (in dna.constraints.home_hub):
+      Must be a 3-letter uppercase IATA code. Anything else risks prompt
+      injection through the DNA context string. Silently clears invalid values
+      rather than erroring — the coordinator falls back to 'Unknown' gracefully.
+
+    query:
+      Strip ASCII control characters (\x00-\x1f) — these have no legitimate
+      use in a travel query and can confuse LLM tokenizers.
+    """
+    # Sanitize query
+    if req.query:
+        req.query = _CONTROL_CHARS_RE.sub('', req.query).strip()
+
+    # Sanitize homeHub inside DNA
+    if req.dna:
+        constraints = req.dna.get('constraints', {})
+        raw_hub = constraints.get('home_hub', '')
+        if raw_hub:
+            cleaned = raw_hub.strip().upper()
+            if not _IATA_RE.match(cleaned):
+                logger.warning(
+                    "Rejected invalid homeHub '%s' for user %s — must be 3-letter IATA code",
+                    raw_hub[:20], req.user_id,
+                )
+                constraints['home_hub'] = ''  # Clear it; coordinator defaults to Unknown
+            else:
+                constraints['home_hub'] = cleaned  # Normalize to uppercase
+
 
 # API Endpoints
 
@@ -169,17 +220,23 @@ async def get_context(req: ContextRequest):
 
 
 @app.post("/api/v2/plan", response_model=PlanResponse)
+@limiter.limit("5/minute")
 async def plan_trip(
+    request: Request,
     req: PlanRequest,
     x_apex_signature: Optional[str] = Header(None),
 ):
     """
     Plan a personalized trip using the Context-Aware Strategic Orchestrator.
 
+    Rate limited: 5 requests per minute per IP.
     HMAC Signature Verification:
       The frontend signs the DNA payload with HMAC-SHA256 using a shared secret.
-      This endpoint verifies the signature before spending Groq credits.
+      This endpoint verifies the signature before spending Groq/Gemini credits.
     """
+    # Sanitize inputs before touching the LLM pipeline
+    _sanitize_request(req)
+
     if not req.user_id or not req.query.strip():
         raise HTTPException(
             status_code=400,
