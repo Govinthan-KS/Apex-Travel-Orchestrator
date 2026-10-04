@@ -24,10 +24,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Model Settings
 # ─────────────────────────────────────────────────────────────────
-# Coordinator: compound-beta on Groq — 70K TPM, no daily cap,
-# designed for orchestration tasks. Replaces llama-3.3-70b-versatile
-# (decommissioned Aug 17 2026).
-COORDINATOR_MODEL = "compound-beta"
+# Coordinator: qwen/qwen3.8-27b on Groq
+COORDINATOR_MODEL = "qwen/qwen3.8-27b"
 
 # Sub-agents: gemini-3.5-flash-lite — best fit for this agentic workload.
 # 15 RPM / 250K TPM / 500 RPD vs gemini-3.5-flash's 5 RPM / 20 RPD.

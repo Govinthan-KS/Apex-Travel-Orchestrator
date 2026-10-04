@@ -331,7 +331,7 @@ def run_coordinator_agent(user_id: str, user_query: str, dna: dict | None = None
     user_context = _get_user_context(user_id, user_query, dna=dna)
     logger.info("Context injected:\n%s", user_context)
 
-    # Initialize coordinator LLM (compound-beta: 70K TPM, no daily cap)
+    # Initialize coordinator LLM (Qwen on Groq)
     llm = ChatGroq(
         groq_api_key=GROQ_API_KEY,
         model_name=COORDINATOR_MODEL,
