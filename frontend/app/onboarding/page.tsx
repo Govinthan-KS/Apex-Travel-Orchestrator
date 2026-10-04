@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, Variants } from 'framer-motion';
 import { submitOnboarding } from './actions';
 import type { OnboardingData } from './actions';
 import { useApexToast } from '@/components/ToastProvider';
@@ -78,11 +78,11 @@ const STEPS = [
    Animation variants — directional slide per step navigation
 ───────────────────────────────────────────────────────────────────────────── */
 
-const stepVariants = {
+const stepVariants: Variants = {
   enter:  (dir: number) => ({ x: dir * 48, opacity: 0 }),
   center: {
     x: 0, opacity: 1,
-    transition: { type: 'spring', stiffness: 380, damping: 32 },
+    transition: { type: 'spring' as const, stiffness: 380, damping: 32 },
   },
   exit:   (dir: number) => ({
     x: dir * -48, opacity: 0,

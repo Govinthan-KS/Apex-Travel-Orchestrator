@@ -71,7 +71,7 @@ export function Button({
       ) : leftIcon ? (
         <i className={`pi ${leftIcon} text-sm`} aria-hidden="true" />
       ) : null}
-      {children}
+      <>{children}</>
     </motion.button>
   );
 }

@@ -16,14 +16,14 @@ interface PlannerLoadingStateProps {
 
 export function PlannerLoadingState({ destination }: PlannerLoadingStateProps) {
   const [msgIndex, setMsgIndex] = useState(0);
-  const intervalRef             = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef             = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* Cycle through loading messages every 2.2 seconds */
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       setMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length);
     }, 2200);
-    return () => clearInterval(intervalRef.current);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
   return (

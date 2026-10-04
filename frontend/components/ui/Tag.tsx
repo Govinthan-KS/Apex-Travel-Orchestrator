@@ -23,14 +23,8 @@ export function Tag({ label, selected = false, icon, className, ...props }: TagP
         'text-sm font-medium border transition-all duration-200 cursor-pointer',
         'focus-visible:outline-2 focus-visible:outline-apex-indigo focus-visible:outline-offset-2',
         selected
-          ? [
-              'bg-apex-indigo-soft border-apex-indigo text-apex-indigo',
-              'shadow-[0_0_0_1px_#E8EBFA]',
-            ]
-          : [
-              'bg-apex-paper border-slate-200 text-apex-text-secondary',
-              'hover:bg-apex-indigo-soft/50 hover:border-apex-indigo/30 hover:text-apex-indigo',
-            ],
+          ? 'bg-apex-indigo-soft border-apex-indigo text-apex-indigo shadow-[0_0_0_1px_#E8EBFA]'
+          : 'bg-apex-paper border-slate-200 text-apex-text-secondary hover:bg-apex-indigo-soft/50 hover:border-apex-indigo/30 hover:text-apex-indigo',
         className
       )}
       {...props}
