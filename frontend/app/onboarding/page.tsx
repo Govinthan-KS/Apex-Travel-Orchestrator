@@ -1,137 +1,514 @@
-/*
- * Onboarding Page — onboarding/page.tsx
- * ========================================
- * The DNA extraction lab. Where we figure out if you're
- * a "budget backpacker eating street food" or a
- * "first-class champagne sipper with a personal concierge."
- *
- * BIG & BOLD edition — same chunky, cotton-candy styling
- * as the trip planner dashboard. Because consistency matters.
- *
- * After completion, calls useSession().update() to refresh
- * the JWT so the dashboard stops redirecting you back here.
- * We learned about JWT staleness the hard way.
- */
+'use client';
 
-"use client";
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { submitOnboarding } from './actions';
+import type { OnboardingData } from './actions';
+import { useApexToast } from '@/components/ToastProvider';
+import { Stepper, Tag, Button } from '@/components/ui';
+import { cn } from '@/lib/utils';
+import { HOME_CITIES, getCityName } from '@/lib/constants';
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { Button } from "primereact/button";
-import { InputText } from "primereact/inputtext";
-import { MultiSelect } from "primereact/multiselect";
-import { Toast } from "primereact/toast";
-import { submitOnboarding } from "./actions";
-import type { OnboardingData } from "./actions";
+/* ─────────────────────────────────────────────────────────────────────────────
+   Option data — stripped of emoji (display-only labels for premium feel)
+───────────────────────────────────────────────────────────────────────────── */
 
-/* ──────────────────────────────────────────────────────────── */
-/* Option Configs                                               */
-/* ──────────────────────────────────────────────────────────── */
-
-const DIETARY_OPTIONS = [
-  { label: "None", value: "none" },
-  { label: "Vegetarian", value: "vegetarian" },
-  { label: "Vegan", value: "vegan" },
-  { label: "Halal", value: "halal" },
-  { label: "Kosher", value: "kosher" },
-  { label: "Gluten-Free", value: "gluten-free" },
+const PACE_OPTIONS = [
+  { value: 'relaxed',   label: 'Relaxed',   icon: 'pi-clock',    desc: 'Two or three sights per day. Space to breathe.' },
+  { value: 'moderate',  label: 'Moderate',  icon: 'pi-compass',  desc: 'A full day without feeling rushed.' },
+  { value: 'intensive', label: 'Intensive', icon: 'pi-bolt',     desc: 'Every hour planned. Maximum ground covered.' },
 ];
 
-const ACCESSIBILITY_OPTIONS = [
-  { label: "Wheelchair", value: "wheelchair" },
-  { label: "Visual Aid", value: "visual_aid" },
-  { label: "Hearing Aid", value: "hearing_aid" },
-  { label: "Mobility Support", value: "mobility_support" },
-  { label: "None", value: "none" },
+const STAY_OPTIONS = [
+  { value: 'budget',    label: 'Budget',    icon: 'pi-wallet',   desc: 'Hostels and guesthouses. Clean and functional.' },
+  { value: 'mid_range', label: 'Mid-Range', icon: 'pi-building', desc: '3-star hotels with good central locations.' },
+  { value: 'luxury',    label: 'Luxury',    icon: 'pi-star',     desc: 'Premium hotels, suites, or boutique stays.' },
+  { value: 'resort',    label: 'Resort',    icon: 'pi-sun',      desc: 'Resort experience with amenities included.' },
 ];
 
 const FLIGHT_CLASS_OPTIONS = [
-  { label: "Economy", value: "economy" },
-  { label: "Premium Eco", value: "premium_economy" },
-  { label: "Business", value: "business" },
-  { label: "First Class", value: "first" },
+  { value: 'economy',         label: 'Economy',       icon: 'pi-send',       desc: 'Standard seating.' },
+  { value: 'premium_economy', label: 'Premium Eco',   icon: 'pi-send',       desc: 'Extra legroom + perks.' },
+  { value: 'business',        label: 'Business',      icon: 'pi-briefcase',  desc: 'Lie-flat beds on long-haul.' },
+  { value: 'first',           label: 'First Class',   icon: 'pi-crown',      desc: 'Suite-level luxury.' },
 ];
 
-const STAY_TIER_OPTIONS = [
-  { label: "Budget", value: "budget" },
-  { label: "Mid-Range", value: "mid_range" },
-  { label: "Luxury", value: "luxury" },
-  { label: "Resort", value: "resort" },
+const DIETARY_OPTIONS = [
+  { value: 'none',         label: 'No restrictions' },
+  { value: 'vegetarian',   label: 'Vegetarian'      },
+  { value: 'vegan',        label: 'Vegan'           },
+  { value: 'halal',        label: 'Halal'           },
+  { value: 'kosher',       label: 'Kosher'          },
+  { value: 'gluten-free',  label: 'Gluten-Free'     },
 ];
 
-const PACE_OPTIONS = [
-  { label: "🐢 Relaxed", value: "relaxed" },
-  { label: "⚖️ Moderate", value: "moderate" },
-  { label: "🚀 Intensive", value: "intensive" },
+const ACCESSIBILITY_OPTIONS = [
+  { value: 'none',             label: 'None needed'    },
+  { value: 'wheelchair',       label: 'Wheelchair'     },
+  { value: 'visual_aid',       label: 'Visual Aid'     },
+  { value: 'hearing_aid',      label: 'Hearing Aid'    },
+  { value: 'mobility_support', label: 'Mobility'       },
 ];
 
 const INTEREST_OPTIONS = [
-  { label: "🏛️ Culture", value: "culture" },
-  { label: "🧗 Adventure", value: "adventure" },
-  { label: "🍜 Food", value: "food" },
-  { label: "🌙 Nightlife", value: "nightlife" },
-  { label: "🌿 Nature", value: "nature" },
-  { label: "🛍️ Shopping", value: "shopping" },
-  { label: "🧘 Relaxation", value: "relaxation" },
+  { value: 'culture',      label: 'Culture'     },
+  { value: 'adventure',    label: 'Adventure'   },
+  { value: 'food',         label: 'Food'        },
+  { value: 'nightlife',    label: 'Nightlife'   },
+  { value: 'nature',       label: 'Nature'      },
+  { value: 'shopping',     label: 'Shopping'    },
+  { value: 'relaxation',   label: 'Relaxation'  },
 ];
 
-/* ──────────────────────────────────────────────────────────── */
-/* Selection State Styles — same as Dashboard                   */
-/* ──────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Step metadata
+───────────────────────────────────────────────────────────────────────────── */
 
-const SELECTED_STYLE: React.CSSProperties = {
-  background: "#7ec8e3",
-  color: "#ffffff",
-  border: "2px solid #a3d980",
-  transform: "scale(1.03)",
-  boxShadow: "0 4px 16px rgba(126, 200, 227, 0.4)",
-};
-
-const IDLE_STYLE: React.CSSProperties = {
-  background: "#f0f9e8",
-  color: "#5a6b5a",
-  border: "2px solid transparent",
-};
-
-/* Step labels */
 const STEPS = [
-  { label: "The Anchors", desc: "Hard constraints — the deal-breakers" },
-  { label: "The Vibes", desc: "Soft preferences — the nice-to-haves" },
-  { label: "Review", desc: "Make sure we got it right" },
-];
+  { title: 'Where do you fly from?',    subtitle: 'Select your home city from the list.' },
+  { title: 'How do you like to travel?', subtitle: 'Your default pace when exploring.' },
+  { title: "What's your stay style?",    subtitle: 'Your preferred accommodation tier.' },
+  { title: 'What do you love doing?',    subtitle: 'Pick everything that fits you.'   },
+  { title: 'A few last details.',        subtitle: 'Diet, flight class, and accessibility.' },
+] as const;
 
-/* ──────────────────────────────────────────────────────────── */
-/* Component                                                    */
-/* ──────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Animation variants — directional slide per step navigation
+───────────────────────────────────────────────────────────────────────────── */
+
+const stepVariants = {
+  enter:  (dir: number) => ({ x: dir * 48, opacity: 0 }),
+  center: {
+    x: 0, opacity: 1,
+    transition: { type: 'spring', stiffness: 380, damping: 32 },
+  },
+  exit:   (dir: number) => ({
+    x: dir * -48, opacity: 0,
+    transition: { duration: 0.15, ease: 'easeIn' },
+  }),
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Local components (tightly coupled to this page's option shape)
+───────────────────────────────────────────────────────────────────────────── */
+
+function OptionCard({
+  icon,
+  title,
+  desc,
+  selected,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className={cn(
+        'w-full text-left rounded-xl p-4 border-2 transition-colors duration-200',
+        'focus-visible:outline-2 focus-visible:outline-apex-indigo focus-visible:outline-offset-2',
+        selected
+          ? 'border-apex-indigo bg-apex-indigo-soft'
+          : 'border-slate-200 bg-white hover:border-apex-indigo/30 hover:bg-apex-indigo-soft/20'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {/* Icon badge */}
+        <div
+          className={cn(
+            'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors',
+            selected ? 'bg-apex-indigo' : 'bg-slate-100'
+          )}
+        >
+          <i
+            className={cn('pi', icon, 'text-sm', selected ? 'text-white' : 'text-apex-text-tertiary')}
+            aria-hidden="true"
+          />
+        </div>
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <p className={cn('font-semibold text-sm', selected ? 'text-apex-indigo' : 'text-apex-text-primary')}>
+            {title}
+          </p>
+          <p className="text-xs text-apex-text-tertiary mt-0.5 leading-snug">{desc}</p>
+        </div>
+
+        {/* Selected checkmark */}
+        {selected && (
+          <i className="pi pi-check-circle text-apex-indigo text-sm mt-0.5 flex-shrink-0" aria-hidden="true" />
+        )}
+      </div>
+    </motion.button>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CityPicker — searchable dropdown for home city selection
+───────────────────────────────────────────────────────────────────────────── */
+
+type CityRow = { code: string; name: string; country: string };
+const CITY_LIST = HOME_CITIES as readonly CityRow[];
+
+function CityPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+}) {
+  const [query,  setQuery]  = useState('');
+  const [open,   setOpen]   = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef    = useRef<HTMLInputElement>(null);
+
+  /* Close on outside click */
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  /* Focus search when dropdown opens */
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+  }, [open]);
+
+  const filtered = CITY_LIST.filter(
+    (c) =>
+      c.name.toLowerCase().includes(query.toLowerCase()) ||
+      c.code.toLowerCase().includes(query.toLowerCase()) ||
+      c.country.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const selected = CITY_LIST.find((c) => c.code === value);
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        id="city-picker-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          'w-full h-12 px-4 border rounded-xl text-left flex items-center justify-between bg-white',
+          'transition-colors duration-150',
+          'focus-visible:outline-2 focus-visible:outline-apex-indigo focus-visible:outline-offset-2',
+          open ? 'border-apex-indigo' : 'border-slate-200 hover:border-apex-indigo/40'
+        )}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <i className="pi pi-map-marker text-apex-text-tertiary text-sm flex-shrink-0" aria-hidden="true" />
+          {selected ? (
+            <span className="text-sm text-apex-text-primary font-medium truncate">
+              {selected.name}
+              <span className="ml-2 text-xs text-apex-text-tertiary font-normal">{selected.code}</span>
+            </span>
+          ) : (
+            <span className="text-sm text-apex-text-tertiary">Select your city…</span>
+          )}
+        </div>
+        <i
+          className={cn(
+            'pi pi-chevron-down text-xs text-apex-text-tertiary flex-shrink-0 transition-transform duration-200',
+            open && 'rotate-180'
+          )}
+          aria-hidden="true"
+        />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0,  scale: 1 }}
+          transition={{ duration: 0.14, ease: 'easeOut' }}
+          role="listbox"
+          aria-label="Select home city"
+          className="absolute z-30 w-full mt-1.5 bg-white rounded-xl shadow-float border border-slate-100 overflow-hidden"
+        >
+          {/* Search */}
+          <div className="p-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus-within:border-apex-indigo transition-colors">
+              <i className="pi pi-search text-xs text-apex-text-tertiary" aria-hidden="true" />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search city or IATA code…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="flex-1 text-sm bg-transparent border-none outline-none text-apex-text-primary placeholder:text-apex-text-tertiary"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="text-apex-text-tertiary hover:text-apex-text-secondary"
+                  aria-label="Clear search"
+                >
+                  <i className="pi pi-times text-[10px]" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="max-h-56 overflow-y-auto overscroll-contain">
+            {filtered.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-apex-text-tertiary text-center">No cities found</p>
+            ) : (
+              filtered.map((city) => (
+                <button
+                  key={city.code}
+                  type="button"
+                  role="option"
+                  aria-selected={city.code === value}
+                  onClick={() => { onChange(city.code); setOpen(false); setQuery(''); }}
+                  className={cn(
+                    'w-full px-4 py-2.5 text-left flex items-center justify-between transition-colors duration-100',
+                    city.code === value
+                      ? 'bg-apex-indigo-soft text-apex-indigo'
+                      : 'hover:bg-slate-50 text-apex-text-primary'
+                  )}
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium">{city.name}</span>
+                    <span className="ml-1.5 text-xs text-apex-text-tertiary">{city.country}</span>
+                  </div>
+                  <span className="text-xs text-apex-text-tertiary flex-shrink-0 ml-4 font-mono">
+                    {city.code}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DNA Preview Card (left panel — dark indigo background variant)
+───────────────────────────────────────────────────────────────────────────── */
+
+function DNAPreviewCard({
+  step,
+  homeHub,
+  travelPace,
+  stayTier,
+  interests,
+  dietary,
+  flightClass,
+}: {
+  step: number;
+  homeHub: string;
+  travelPace: string;
+  stayTier: string;
+  interests: string[];
+  dietary: string;
+  flightClass: string;
+}) {
+  const getLabel = (
+    options: { label: string; value: string }[],
+    value: string
+  ) => options.find((o) => o.value === value)?.label ?? value;
+
+  const fields = [
+    {
+      label:   'Home Hub',
+      value:   homeHub ? getCityName(homeHub) : '—',
+      done:    !!homeHub,
+      forStep: 0,
+    },
+    {
+      label:   'Travel Pace',
+      value:   getLabel(PACE_OPTIONS, travelPace),
+      done:    step > 1,
+      forStep: 1,
+    },
+    {
+      label:   'Stay Style',
+      value:   getLabel(STAY_OPTIONS, stayTier),
+      done:    step > 2,
+      forStep: 2,
+    },
+    {
+      label:   'Interests',
+      value:   interests.length
+        ? interests.map((i) => getLabel(INTEREST_OPTIONS, i)).join(', ')
+        : '—',
+      done:    step > 3 && interests.length > 0,
+      forStep: 3,
+    },
+    {
+      label:   'Dietary',
+      value:   getLabel(DIETARY_OPTIONS, dietary),
+      done:    step > 4,
+      forStep: 4,
+    },
+    {
+      label:   'Flight Class',
+      value:   getLabel(FLIGHT_CLASS_OPTIONS, flightClass),
+      done:    step > 4,
+      forStep: 4,
+    },
+  ];
+
+  return (
+    <div
+      className="rounded-2xl p-6"
+      style={{
+        background: 'rgba(255, 255, 255, 0.07)',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      {/* Card header */}
+      <div className="flex items-center gap-2.5 mb-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="w-8 h-8 rounded-lg apex-indigo-bg flex items-center justify-center flex-shrink-0">
+          <span className="font-display font-bold text-sm text-apex-gold">A</span>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-white/90 tracking-wider uppercase">
+            Travel DNA
+          </p>
+          <p className="text-xs text-white/40">Live preview</p>
+        </div>
+      </div>
+
+      {/* Fields */}
+      <div className="space-y-4">
+        {fields.map((field) => {
+          const isCurrent = field.forStep === step;
+          return (
+            <motion.div
+              key={field.label}
+              className="flex items-start justify-between gap-3"
+              animate={{ opacity: field.forStep > step ? 0.35 : 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                {field.done && (
+                  <i className="pi pi-check text-emerald-400" style={{ fontSize: '10px' }} aria-hidden="true" />
+                )}
+                {isCurrent && !field.done && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-apex-gold flex-shrink-0 apex-pulse-dot" aria-hidden="true" />
+                )}
+                {!field.done && !isCurrent && (
+                  <div className="w-2 flex-shrink-0" aria-hidden="true" />
+                )}
+                <span
+                  className="text-xs font-apex-mono uppercase tracking-wider truncate"
+                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                >
+                  {field.label}
+                </span>
+              </div>
+              <span
+                className={cn(
+                  'text-sm font-medium text-right truncate max-w-[55%]',
+                  field.value === '—' ? 'text-white/25' : 'text-white/90'
+                )}
+              >
+                {field.value}
+              </span>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Main page
+───────────────────────────────────────────────────────────────────────────── */
 
 export default function OnboardingPage() {
-  const toast = useRef<Toast>(null);
-  const router = useRouter();
-  const { update: updateSession } = useSession();
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(0);
+  const router                     = useRouter();
+  const { update: updateSession }  = useSession();
+  const { showSuccess, showError, showWarn } = useApexToast();
 
-  /* ── Step 1: Hard Constraints ── */
-  const [dietary, setDietary] = useState("none");
-  const [homeHub, setHomeHub] = useState("");
-  const [accessibility, setAccessibility] = useState<string[]>([]);
+  const [step,      setStep]      = useState(0);
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const [loading,   setLoading]   = useState(false);
 
-  /* ── Step 2: Soft Preferences ── */
-  const [travelPace, setTravelPace] = useState("moderate");
-  const [flightClass, setFlightClass] = useState("economy");
-  const [stayTier, setStayTier] = useState("mid_range");
+  /* ── Step 0: Home Hub ─────────────────────────── */
+  const [homeHub, setHomeHub] = useState('');
+
+  /* ── Step 1: Travel Pace ─────────────────────── */
+  const [travelPace, setTravelPace] = useState('moderate');
+
+  /* ── Step 2: Stay Style ──────────────────────── */
+  const [stayTier, setStayTier] = useState('mid_range');
+
+  /* ── Step 3: Interests ───────────────────────── */
   const [interests, setInterests] = useState<string[]>([]);
 
-  /* ── Submit Handler ── */
+  /* ── Step 4: Details ─────────────────────────── */
+  const [dietary,       setDietary]       = useState('none');
+  const [flightClass,   setFlightClass]   = useState('economy');
+  const [accessibility, setAccessibility] = useState<string[]>([]);
+
+  /* ── Navigation ──────────────────────────────── */
+  const canProceed = step !== 0 || homeHub.trim().length > 0;
+
+  const goNext = useCallback(() => {
+    if (step === 0 && !homeHub.trim()) {
+      showWarn('Home Hub required', 'Please select your home city to continue.');
+      return;
+    }
+    setDirection(1);
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  }, [step, homeHub, showWarn]);
+
+  const goBack = useCallback(() => {
+    setDirection(-1);
+    setStep((s) => Math.max(s - 1, 0));
+  }, []);
+
+  const toggleInterest = useCallback((value: string) => {
+    setInterests((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  }, []);
+
+  const toggleAccessibility = useCallback((value: string) => {
+    if (value === 'none') {
+      setAccessibility(['none']);
+      return;
+    }
+    setAccessibility((prev) => {
+      const withoutNone = prev.filter((v) => v !== 'none');
+      return withoutNone.includes(value)
+        ? withoutNone.filter((v) => v !== value)
+        : [...withoutNone, value];
+    });
+  }, []);
+
+  /* ── Submit ──────────────────────────────────── */
   const handleSubmit = async () => {
     if (!homeHub.trim()) {
-      toast.current?.show({
-        severity: "warn",
-        summary: "Missing Field",
-        detail: "Please enter your Home Hub airport code.",
-        life: 3000,
-      });
+      showWarn('Home Hub required', 'Please go back and select your home city.');
       return;
     }
 
@@ -139,8 +516,8 @@ export default function OnboardingPage() {
     try {
       const data: OnboardingData = {
         dietary,
-        homeHub: homeHub.trim().toUpperCase(),
-        accessibility: accessibility.filter((a) => a !== "none"),
+        homeHub:       homeHub.trim().toUpperCase(),
+        accessibility: accessibility.filter((a) => a !== 'none'),
         travelPace,
         flightClass,
         stayTier,
@@ -150,463 +527,305 @@ export default function OnboardingPage() {
       const result = await submitOnboarding(data);
 
       if (result.success) {
-        toast.current?.show({
-          severity: "success",
-          summary: "All Set! 🎉",
-          detail: "Your travel DNA has been saved. Redirecting to the cockpit...",
-          life: 2500,
-        });
+        showSuccess('Profile saved.', 'Your travel DNA is ready. Taking you to the dashboard.');
 
         /*
-         * THIS IS THE CRITICAL LINE.
-         * Calling update() refreshes the JWT token. The jwt callback
-         * re-checks the surveys collection and clears needsOnboarding.
-         * Without this, the dashboard would keep redirecting you back
-         * here forever. We learned this the hard way.
+         * CRITICAL: updateSession() refreshes the JWT so the jwt callback
+         * re-checks surveys and clears needsOnboarding. Without this, the
+         * dashboard keeps redirecting back here indefinitely.
          */
         await updateSession();
 
-        setTimeout(() => router.push("/dashboard"), 1500);
+        setTimeout(() => router.push('/dashboard'), 1200);
       } else {
-        toast.current?.show({
-          severity: "error",
-          summary: "Error",
-          detail: result.error || "Failed to save preferences.",
-          life: 4000,
-        });
+        showError('Could not save profile.', result.error ?? 'Please try again.');
         setLoading(false);
       }
     } catch {
-      toast.current?.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Something went wrong. Please try again.",
-        life: 4000,
-      });
+      showError('Something went wrong.', 'Please check your connection and try again.');
       setLoading(false);
     }
   };
 
-  /* ── Get label from option value ── */
-  const getLabel = (options: { label: string; value: string }[], value: string) =>
-    options.find((o) => o.value === value)?.label ?? value;
+  const isLastStep = step === STEPS.length - 1;
 
-  /* ════════════════════════════════════════════════════════════ */
-  /* Render — BIG & BOLD, same DNA as the dashboard              */
-  /* ════════════════════════════════════════════════════════════ */
+  /* ─────────────────────────────────────────────────────────────────────────
+     Render
+  ───────────────────────────────────────────────────────────────────────── */
   return (
-    <>
-      <Toast ref={toast} position="top-right" />
+    <div className="flex min-h-screen">
 
-      <div style={{ maxWidth: "920px", margin: "0 auto", padding: "3rem 2rem" }}>
-        {/* ── Page Header ── */}
-        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
-          <div
-            style={{
-              width: "72px",
-              height: "72px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #7ec8e3, #a3d980)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 1.5rem",
-              boxShadow: "0 4px 20px rgba(126, 200, 227, 0.35)",
-            }}
-          >
-            <i className="pi pi-compass" style={{ fontSize: "2rem", color: "#ffffff" }} />
+      {/* ── Left: DNA Preview Panel (desktop only) ──────────────────────── */}
+      <aside
+        className="hidden lg:flex lg:w-[360px] xl:w-[400px] apex-indigo-bg flex-col justify-between p-10 sticky top-0 h-screen"
+        aria-label="Travel DNA preview"
+      >
+        {/* Top: Logo + tagline */}
+        <div>
+          <div className="flex items-center gap-2.5 mb-12">
+            <div className="w-8 h-8 rounded-lg apex-indigo-bg border border-white/20 flex items-center justify-center">
+              <span className="font-display font-bold text-sm text-apex-gold">A</span>
+            </div>
+            <span className="font-display font-semibold text-white text-lg">Apex</span>
           </div>
-          <h1
-            style={{
-              fontSize: "2.8rem",
-              fontWeight: 900,
-              color: "#1a2e1a",
-              margin: 0,
-              letterSpacing: "-0.5px",
-            }}
-          >
-            Set Up Your Travel DNA
-          </h1>
-          <p style={{ color: "#5a6b5a", fontSize: "1.2rem", marginTop: "0.6rem" }}>
-            Help our agents plan the perfect trip for you
+
+          <p className="text-xs font-semibold text-white/40 tracking-[0.2em] uppercase mb-2">
+            Building your profile
+          </p>
+          <h2 className="font-display text-2xl text-white mb-8 leading-snug">
+            Your travel DNA<br />takes shape.
+          </h2>
+
+          {/* Live DNA preview */}
+          <DNAPreviewCard
+            step={step}
+            homeHub={homeHub}
+            travelPace={travelPace}
+            stayTier={stayTier}
+            interests={interests}
+            dietary={dietary}
+            flightClass={flightClass}
+          />
+        </div>
+
+        {/* Bottom: privacy note */}
+        <p className="text-xs text-white/30 leading-relaxed">
+          Your travel DNA is private and used only to personalise your itineraries.
+          You can update it at any time from your profile.
+        </p>
+      </aside>
+
+      {/* ── Right: Form Panel ───────────────────────────────────────────── */}
+      <main className="flex-1 flex items-center justify-center min-h-screen pt-20 pb-12 px-6 apex-hero-bg">
+        <div className="w-full max-w-lg">
+
+          {/* Stepper */}
+          <Stepper total={STEPS.length} current={step} className="mb-8" />
+
+          {/* Step card */}
+          <div className="bg-white rounded-2xl shadow-float overflow-hidden">
+
+            {/* Step header */}
+            <div className="px-8 pt-8 pb-6 border-b border-slate-100">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`header-${step}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <h1 className="font-display text-2xl text-apex-text-primary mb-1">
+                    {STEPS[step].title}
+                  </h1>
+                  <p className="text-sm text-apex-text-secondary">
+                    {STEPS[step].subtitle}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Step body */}
+            <div className="px-8 py-6 min-h-[260px]">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={step}
+                  custom={direction}
+                  variants={stepVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                >
+
+                  {/* ── Step 0: Home Hub ───────────────────────────────── */}
+                  {step === 0 && (
+                    <div>
+                      <CityPicker value={homeHub} onChange={setHomeHub} />
+                      <p className="mt-3 text-xs text-apex-text-tertiary leading-relaxed">
+                        Your home city is used to find the best flight routes for every trip you plan.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* ── Step 1: Travel Pace ────────────────────────────── */}
+                  {step === 1 && (
+                    <div
+                      className="flex flex-col gap-3"
+                      role="radiogroup"
+                      aria-label="Travel pace options"
+                    >
+                      {PACE_OPTIONS.map((opt) => (
+                        <OptionCard
+                          key={opt.value}
+                          icon={opt.icon}
+                          title={opt.label}
+                          desc={opt.desc}
+                          selected={travelPace === opt.value}
+                          onClick={() => setTravelPace(opt.value)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Step 2: Stay Style ─────────────────────────────── */}
+                  {step === 2 && (
+                    <div
+                      className="grid grid-cols-2 gap-3"
+                      role="radiogroup"
+                      aria-label="Stay tier options"
+                    >
+                      {STAY_OPTIONS.map((opt) => (
+                        <OptionCard
+                          key={opt.value}
+                          icon={opt.icon}
+                          title={opt.label}
+                          desc={opt.desc}
+                          selected={stayTier === opt.value}
+                          onClick={() => setStayTier(opt.value)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Step 3: Interests ──────────────────────────────── */}
+                  {step === 3 && (
+                    <div>
+                      <p className="text-xs text-apex-text-tertiary mb-4">
+                        Select all that apply — these shape what Apex recommends.
+                      </p>
+                      <div
+                        className="flex flex-wrap gap-2.5"
+                        role="group"
+                        aria-label="Interest options"
+                      >
+                        {INTEREST_OPTIONS.map((opt) => (
+                          <Tag
+                            key={opt.value}
+                            label={opt.label}
+                            selected={interests.includes(opt.value)}
+                            onClick={() => toggleInterest(opt.value)}
+                          />
+                        ))}
+                      </div>
+                      {interests.length > 0 && (
+                        <p className="mt-3 text-xs text-apex-text-tertiary">
+                          {interests.length} selected
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Step 4: Details ────────────────────────────────── */}
+                  {step === 4 && (
+                    <div className="space-y-6">
+                      {/* Dietary */}
+                      <div>
+                        <p className="text-xs font-semibold text-apex-text-secondary uppercase tracking-wider mb-3">
+                          Dietary preference
+                        </p>
+                        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Dietary preference">
+                          {DIETARY_OPTIONS.map((opt) => (
+                            <Tag
+                              key={opt.value}
+                              label={opt.label}
+                              selected={dietary === opt.value}
+                              onClick={() => setDietary(opt.value)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Flight Class */}
+                      <div>
+                        <p className="text-xs font-semibold text-apex-text-secondary uppercase tracking-wider mb-3">
+                          Preferred flight class
+                        </p>
+                        <div
+                          className="grid grid-cols-2 gap-2.5"
+                          role="radiogroup"
+                          aria-label="Flight class options"
+                        >
+                          {FLIGHT_CLASS_OPTIONS.map((opt) => (
+                            <OptionCard
+                              key={opt.value}
+                              icon={opt.icon}
+                              title={opt.label}
+                              desc={opt.desc}
+                              selected={flightClass === opt.value}
+                              onClick={() => setFlightClass(opt.value)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Accessibility */}
+                      <div>
+                        <p className="text-xs font-semibold text-apex-text-secondary uppercase tracking-wider mb-3">
+                          Accessibility needs
+                        </p>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Accessibility options">
+                          {ACCESSIBILITY_OPTIONS.map((opt) => (
+                            <Tag
+                              key={opt.value}
+                              label={opt.label}
+                              selected={accessibility.includes(opt.value)}
+                              onClick={() => toggleAccessibility(opt.value)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Navigation footer */}
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                disabled={step === 0}
+                leftIcon="pi-arrow-left"
+              >
+                Back
+              </Button>
+
+              {isLastStep ? (
+                <Button
+                  variant="primary"
+                  size="md"
+                  loading={loading}
+                  onClick={handleSubmit}
+                  disabled={loading}
+                >
+                  {loading ? 'Saving…' : 'Confirm & Save'}
+                  {!loading && (
+                    <i className="pi pi-check ml-1 text-xs" aria-hidden="true" />
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={goNext}
+                  disabled={!canProceed}
+                >
+                  Continue
+                  <i className="pi pi-arrow-right ml-1 text-xs" aria-hidden="true" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Step label (mobile only — left panel is hidden) */}
+          <p className="lg:hidden mt-4 text-center text-xs text-apex-text-tertiary">
+            {STEPS[step].title}
           </p>
         </div>
-
-        {/* ── Step Indicator ── */}
-        <div className="flex justify-content-center gap-3" style={{ marginBottom: "2.5rem" }}>
-          {STEPS.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => setStep(i)}
-              style={{
-                padding: "0.75rem 1.5rem",
-                borderRadius: "12px",
-                fontSize: "1rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                ...(step === i ? SELECTED_STYLE : IDLE_STYLE),
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Form Card ── */}
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "20px",
-            padding: "3rem",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
-            border: "2px solid #e8f8d8",
-            marginBottom: "2.5rem",
-          }}
-        >
-          {/* ════════ STEP 1: THE ANCHORS ════════ */}
-          {step === 0 && (
-            <div style={{ animation: "fadeInUp 0.3s ease-out" }}>
-              <h3 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#1a2e1a", marginBottom: "0.5rem" }}>
-                The Anchors
-              </h3>
-              <p style={{ color: "#5a6b5a", fontSize: "1rem", marginBottom: "2rem" }}>
-                These are the deal-breakers — the stuff we absolutely need to know.
-              </p>
-
-              {/* Dietary */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-heart" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Dietary Preference
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {DIETARY_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setDietary(opt.value)}
-                      style={{
-                        padding: "0.75rem 1.5rem",
-                        borderRadius: "12px",
-                        fontSize: "1.05rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        ...(dietary === opt.value ? SELECTED_STYLE : IDLE_STYLE),
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Accessibility */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-shield" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Accessibility Needs
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {ACCESSIBILITY_OPTIONS.map((opt) => {
-                    const isSelected = accessibility.includes(opt.value);
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          setAccessibility((prev) =>
-                            isSelected ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
-                          );
-                        }}
-                        style={{
-                          padding: "0.75rem 1.5rem",
-                          borderRadius: "12px",
-                          fontSize: "1.05rem",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          transition: "all 0.2s ease",
-                          ...(isSelected ? SELECTED_STYLE : IDLE_STYLE),
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Home Hub */}
-              <div>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-map-marker" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Home Hub Airport Code
-                </label>
-                <InputText
-                  value={homeHub}
-                  onChange={(e) => setHomeHub(e.target.value)}
-                  placeholder="e.g. JFK, LHR, MAA"
-                  className="w-full"
-                  style={{
-                    textTransform: "uppercase",
-                    letterSpacing: "2px",
-                    fontWeight: 700,
-                    fontSize: "1.2rem",
-                    padding: "0.85rem 1.2rem",
-                    borderRadius: "12px",
-                    border: "2px solid #e8f8d8",
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ════════ STEP 2: THE VIBES ════════ */}
-          {step === 1 && (
-            <div style={{ animation: "fadeInUp 0.3s ease-out" }}>
-              <h3 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#1a2e1a", marginBottom: "0.5rem" }}>
-                The Vibes
-              </h3>
-              <p style={{ color: "#5a6b5a", fontSize: "1rem", marginBottom: "2rem" }}>
-                The nice-to-haves. Tell us how you like to travel.
-              </p>
-
-              {/* Travel Pace */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-bolt" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Travel Pace
-                </label>
-                <div className="flex gap-3">
-                  {PACE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setTravelPace(opt.value)}
-                      style={{
-                        padding: "0.85rem 2rem",
-                        borderRadius: "12px",
-                        fontSize: "1.1rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        flex: 1,
-                        ...(travelPace === opt.value ? SELECTED_STYLE : IDLE_STYLE),
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Flight Class */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-send" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Preferred Flight Class
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {FLIGHT_CLASS_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setFlightClass(opt.value)}
-                      style={{
-                        padding: "0.75rem 1.5rem",
-                        borderRadius: "12px",
-                        fontSize: "1.05rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        ...(flightClass === opt.value ? SELECTED_STYLE : IDLE_STYLE),
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Stay Tier */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-building" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Preferred Stay Tier
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {STAY_TIER_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setStayTier(opt.value)}
-                      style={{
-                        padding: "0.75rem 1.5rem",
-                        borderRadius: "12px",
-                        fontSize: "1.05rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        ...(stayTier === opt.value ? SELECTED_STYLE : IDLE_STYLE),
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Interests */}
-              <div>
-                <label style={{ fontWeight: 700, color: "#3a4a3a", display: "block", marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <i className="pi pi-star" style={{ color: "#7ec8e3", marginRight: "0.5rem" }} />
-                  Interests
-                </label>
-                <MultiSelect
-                  value={interests}
-                  onChange={(e) => setInterests(e.value)}
-                  options={INTEREST_OPTIONS}
-                  placeholder="Select your interests"
-                  display="chip"
-                  className="w-full"
-                  style={{ fontSize: "1.05rem", borderRadius: "12px", border: "2px solid #e8f8d8" }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ════════ STEP 3: REVIEW ════════ */}
-          {step === 2 && (
-            <div style={{ animation: "fadeInUp 0.3s ease-out" }}>
-              <h3 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#1a2e1a", marginBottom: "0.5rem" }}>
-                Review Your Travel DNA
-              </h3>
-              <p style={{ color: "#5a6b5a", fontSize: "1rem", marginBottom: "2rem" }}>
-                Make sure everything looks right before we save it.
-              </p>
-
-              {/* Anchors Summary */}
-              <div
-                style={{
-                  background: "#d1f0b120",
-                  borderRadius: "16px",
-                  padding: "1.5rem",
-                  borderLeft: "5px solid #a3d980",
-                  marginBottom: "1.5rem",
-                }}
-              >
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#2a5a2a", marginBottom: "1rem", marginTop: 0 }}>
-                  🎯 The Anchors
-                </h4>
-                <div className="flex flex-column gap-3" style={{ fontSize: "1.05rem", color: "#3a4a3a" }}>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-heart" style={{ color: "#7ec8e3" }} />
-                    <strong>Dietary:</strong> {getLabel(DIETARY_OPTIONS, dietary)}
-                  </div>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-map-marker" style={{ color: "#7ec8e3" }} />
-                    <strong>Home Hub:</strong> {homeHub.toUpperCase() || "—"}
-                  </div>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-shield" style={{ color: "#7ec8e3" }} />
-                    <strong>Accessibility:</strong>{" "}
-                    {accessibility.length > 0
-                      ? accessibility.map((a) => getLabel(ACCESSIBILITY_OPTIONS, a)).join(", ")
-                      : "None"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Vibes Summary */}
-              <div
-                style={{
-                  background: "#7ec8e315",
-                  borderRadius: "16px",
-                  padding: "1.5rem",
-                  borderLeft: "5px solid #7ec8e3",
-                }}
-              >
-                <h4 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#1a4a6a", marginBottom: "1rem", marginTop: 0 }}>
-                  ✨ The Vibes
-                </h4>
-                <div className="flex flex-column gap-3" style={{ fontSize: "1.05rem", color: "#3a4a3a" }}>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-bolt" style={{ color: "#a3d980" }} />
-                    <strong>Pace:</strong> {getLabel(PACE_OPTIONS, travelPace)}
-                  </div>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-send" style={{ color: "#a3d980" }} />
-                    <strong>Flight:</strong> {getLabel(FLIGHT_CLASS_OPTIONS, flightClass)}
-                  </div>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-building" style={{ color: "#a3d980" }} />
-                    <strong>Stay:</strong> {getLabel(STAY_TIER_OPTIONS, stayTier)}
-                  </div>
-                  <div className="flex align-items-center gap-2">
-                    <i className="pi pi-star" style={{ color: "#a3d980" }} />
-                    <strong>Interests:</strong>{" "}
-                    {interests.length > 0
-                      ? interests.map((i) => getLabel(INTEREST_OPTIONS, i)).join(", ")
-                      : "None selected"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Navigation — CHUNKY, same as dashboard ── */}
-          <div className="flex justify-content-between" style={{ marginTop: "3rem" }}>
-            <Button
-              label="Back"
-              icon="pi pi-arrow-left"
-              className="p-button-text"
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-              disabled={step === 0}
-              style={{ color: "#5a6b5a", fontSize: "1.05rem", padding: "0.75rem 1.5rem" }}
-            />
-
-            {step < 2 ? (
-              <Button
-                label="Next"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                onClick={() => setStep((s) => s + 1)}
-                style={{ fontSize: "1.05rem", padding: "0.75rem 2rem" }}
-              />
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !homeHub.trim()}
-                style={{
-                  padding: "1rem 2.5rem",
-                  fontSize: "1.2rem",
-                  fontWeight: 800,
-                  border: "none",
-                  borderRadius: "14px",
-                  cursor: homeHub.trim() && !loading ? "pointer" : "not-allowed",
-                  background: homeHub.trim() && !loading
-                    ? "linear-gradient(135deg, #d1f0b1 0%, #a3d980 100%)"
-                    : "#e0e0e0",
-                  color: homeHub.trim() && !loading ? "#1a2e1a" : "#999",
-                  boxShadow: homeHub.trim() && !loading ? "0 4px 20px rgba(163, 217, 128, 0.4)" : "none",
-                  transition: "all 0.25s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.6rem",
-                }}
-              >
-                {loading ? (
-                  <>
-                    <i className="pi pi-spin pi-spinner" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <i className="pi pi-check" />
-                    Confirm
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 }

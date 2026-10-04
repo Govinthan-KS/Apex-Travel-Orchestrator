@@ -1,23 +1,264 @@
 @import "tailwindcss";
 
+/*
+  Fonts are loaded via next/font/google in layout.tsx (self-hosted by Next.js).
+  CSS variables (--font-inter, --font-playfair, --font-jetbrains) are set on
+  the <html> element at runtime and referenced here.
+*/
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   APEX DESIGN SYSTEM — Design Tokens
+   All custom values flow through here. No other CSS files needed.
+───────────────────────────────────────────────────────────────────────────── */
+
 @theme {
-  --color-primary: var(--color-lime-400);
-  --color-primary-hover: var(--color-lime-500);
-  
-  --color-surface-ground: var(--color-slate-950);
-  --color-surface-card: var(--color-slate-900);
-  --color-surface-border: var(--color-slate-800);
-  
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  /* Fonts — resolved at runtime via next/font CSS variables */
+  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), Georgia, 'Times New Roman', serif;
+  --font-mono:    var(--font-jetbrains), 'Courier New', Courier, monospace;
+
+  /* ── Core backgrounds ──────────────────────────── */
+  --color-apex-paper:     #FAF9F6;
+  --color-apex-parchment: #F0EDE4;
+  --color-apex-surface:   #FFFFFF;
+
+  /* ── Brand (intelligence) ──────────────────────── */
+  --color-apex-indigo:      #1E2B5C;
+  --color-apex-indigo-mid:  #2D3F8E;
+  --color-apex-indigo-soft: #E8EBFA;
+
+  /* ── Accent (luxury signal) ────────────────────── */
+  --color-apex-gold:      #B8864E;
+  --color-apex-gold-soft: #F5ECD8;
+
+  /* ── Text scale ────────────────────────────────── */
+  --color-apex-text-primary:   #0F172A;
+  --color-apex-text-secondary: #475569;
+  --color-apex-text-tertiary:  #94A3B8;
+
+  /* ── Semantic ──────────────────────────────────── */
+  --color-apex-success: #059669;
+  --color-apex-error:   #DC2626;
+  --color-apex-warning: #D97706;
+
+  /* ── Shadows ───────────────────────────────────── */
+  --shadow-glass: 0 8px 32px rgba(30, 43, 92, 0.08), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  --shadow-card:  0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-float: 0 16px 48px rgba(15, 23, 42, 0.12);
+  --shadow-heavy: 0 24px 64px rgba(15, 23, 42, 0.18);
+
+  /* ── Registered keyframe animations ───────────── */
+  --animate-shimmer:     shimmer 2s linear infinite;
+  --animate-pulse-dot:   pulse-dot 1.5s ease-in-out infinite;
+  --animate-fade-in:     fade-in 0.4s ease-out forwards;
+  --animate-fade-in-up:  fade-in-up 0.5s ease-out forwards;
+  --animate-spin-slow:   spin 0.8s linear infinite;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   BASE
+───────────────────────────────────────────────────────────────────────────── */
+
 @layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-slate-950 text-slate-200 font-sans antialiased;
+    background-color: #FAF9F6;
+    color: #0F172A;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+  }
+
+  /* Inputs: light mode only (overrides browser dark-mode date picker) */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
+    color-scheme: light;
+  }
+
+  /* Global focus ring — consistent, brand-aligned */
+  *:focus-visible {
+    outline: 2px solid #1E2B5C;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Accessible motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-/* Specific overrides for color-scheme on date inputs */
-input[type="date"] {
-  color-scheme: dark;
+/* ─────────────────────────────────────────────────────────────────────────────
+   UTILITIES — Reusable design patterns
+───────────────────────────────────────────────────────────────────────────── */
+
+@layer utilities {
+
+  /* Glass morphism — only use against gradient/image backdrops */
+  .apex-glass {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 8px 32px rgba(30, 43, 92, 0.08),
+                0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  }
+
+  /* Ambient gradient background — landing page, dashboard, login */
+  .apex-hero-bg {
+    background:
+      radial-gradient(ellipse 60% 40% at 30% 20%, rgba(30, 43, 92, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 80% 80%, rgba(184, 134, 78, 0.05) 0%, transparent 60%),
+      #FAF9F6;
+  }
+
+  /* Used for indigo-filled sections (onboarding left panel, final CTA) */
+  .apex-indigo-bg {
+    background: linear-gradient(135deg, #1E2B5C 0%, #2D3F8E 100%);
+  }
+
+  /* Skeleton loading shimmer */
+  .apex-shimmer {
+    background: linear-gradient(
+      90deg,
+      #F0EDE4 0%,
+      #FAF9F6 50%,
+      #F0EDE4 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Font family overrides */
+  .font-display {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  }
+
+  .font-apex-mono {
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+  }
+
+  /* Loading spinner (used in Button) */
+  .apex-spin {
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* Pulsing dot (used in loading agent badges) */
+  .apex-pulse-dot {
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   KEYFRAMES
+───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  50%       { transform: scale(1.4); opacity: 0.6; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes progress-indeterminate {
+  0%   { left: -40%; width: 40%; }
+  60%  { left: 100%; width: 40%; }
+  100% { left: 100%; width: 40%; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Range slider — .apex-slider
+   Uses a CSS custom property --fill-pct (set inline via JS) for the track fill.
+───────────────────────────────────────────────────────────────────────────── */
+
+.apex-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    #1E2B5C var(--fill-pct, 0%),
+    #E2E8F0 var(--fill-pct, 0%)
+  );
+}
+
+/* Webkit (Chrome, Safari, Edge) thumb */
+.apex-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1E2B5C;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 6px rgba(30, 43, 92, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.apex-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 10px rgba(30, 43, 92, 0.45);
+}
+
+.apex-slider::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+}
+
+/* Firefox thumb */
+.apex-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1E2B5C;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 6px rgba(30, 43, 92, 0.35);
+  cursor: pointer;
+}
+
+/* Firefox track */
+.apex-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: #E2E8F0;
+}
+
+.apex-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 9999px;
+  background: #1E2B5C;
+}
+
