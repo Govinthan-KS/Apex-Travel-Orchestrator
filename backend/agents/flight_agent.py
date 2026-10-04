@@ -59,13 +59,14 @@ def run_flight_agent(query: str) -> str:
     1. EXTRACT DATA: Extract Departure City, Arrival City, Date (YYYY-MM-DD), and Preferred Class.
     2. HOME HUB PRIORITY: If the Coordinator specifies a "home hub" or "home airport",
        use it as the default departure city.
-    3. STEP 1 — PRIMARY SEARCH: Always try search_flights first with a valid JSON payload:
-       Action Input: {"departure_city": "departure", "arrival_city": "arrival", "flight_date": "YYYY-MM-DD"}
-       Example: Action Input: {"departure_city": "Chennai", "arrival_city": "Tokyo", "flight_date": "2026-05-15"}
-    4. STEP 2 — FALLBACK (if search_flights returns "No flights found" or validation errors):
+    3. STEP 1 — PRIMARY SEARCH: Always try search_flights first using comma-separated format:
+       Action Input: departure_city, arrival_city, YYYY-MM-DD
+       Example: Action Input: Chennai, Tokyo, 2026-08-05
+       Example: Action Input: MAA, NRT, 2026-08-05
+    4. STEP 2 — FALLBACK (if search_flights returns "No flights found" or a validation error):
        You MUST immediately use web_search_flights to find alternative routes. Do NOT re-call search_flights under any circumstances.
        Action: web_search_flights
-       Action Input: {"query": "flights from [departure] to [arrival] airlines routes prices"}
+       Action Input: flights from [departure] to [arrival] airlines routes prices
        NEVER repeat the failed search_flights call. NEVER return "Action: None".
     5. STEP 3 — SYNTHESIS: Use whatever data you found to provide:
        - Airline names and route info (direct or connections)
@@ -80,11 +81,11 @@ def run_flight_agent(query: str) -> str:
     Follow this format STRICTLY:
     Thought: I need to extract the travel details from the DNA-enriched request.
     Action: (one of: {tool_names})
-    Action Input: {{"parameter": "your valid JSON input here"}}
+    Action Input: departure_city, arrival_city, YYYY-MM-DD
     Observation: the result of the action
     Thought: (if search_flights found nothing, I will use web_search_flights as fallback)
     Action: (one of: {tool_names})
-    Action Input: your fallback query (JSON)
+    Action Input: your fallback query as a plain string
     Observation: the fallback result
     Thought: I have enough data to compile a flight report.
     Final Answer: A clear summary of airline names, routes (direct or connections),

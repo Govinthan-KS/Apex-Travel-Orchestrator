@@ -102,7 +102,7 @@ def get_iata_code(city_name: str) -> str:
     return None
 
 
-@tool(args_schema=FlightSearchArgs)
+@tool
 def search_flights(departure_city: str, arrival_city: str, flight_date: str = None) -> str:
     """
     Searches for available flight schedules between two cities using the Aviationstack API.
@@ -191,7 +191,7 @@ def search_flights(departure_city: str, arrival_city: str, flight_date: str = No
 # "No flights found." — the agent prompt enforces this.
 # ──────────────────────────────────────────────────────────────
 
-@tool(args_schema=WebSearchFlightsArgs)
+@tool
 def web_search_flights(query: str) -> str:
     """
     Fallback flight search using Tavily web search. Use this ONLY when search_flights

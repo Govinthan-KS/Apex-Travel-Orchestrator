@@ -74,9 +74,12 @@ def _vectorize(text: str) -> list[float]:
         
     try:
         embedding = _embed_model.feature_extraction(
+            text=text,         # huggingface_hub ≥0.23: renamed from `inputs` to `text`
             model=EMBEDDING_MODEL_NAME,
-            inputs=text
         )
+        # huggingface_hub may return a numpy.ndarray — Pinecone requires a native list[float].
+        if hasattr(embedding, 'tolist'):
+            embedding = embedding.tolist()
         # HuggingFace Inference API sometimes returns shape [[float, ...]] (batch of 1)
         # instead of [float, ...]. Pinecone requires a flat list, so unwrap if needed.
         if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):

@@ -29,13 +29,14 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from agents.flight_agent import run_flight_agent
 from agents.hotel_agent import run_hotel_agent
 from agents.attraction_agent import run_attraction_agent
 from brain_hook import get_augmented_context
-from config import GROQ_API_KEY, COORDINATOR_MODEL
+from config import GROQ_API_KEY, GOOGLE_API_KEY, COORDINATOR_MODEL, SUB_AGENT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -256,34 +257,50 @@ Output ONLY the JSON array — no preamble, no explanation, no markdown fences.
 """
 
 def _synthesize_itinerary(
-    llm: ChatGroq,
     user_query: str,
     user_context: str,
     results: dict,
 ) -> str:
     """
     Phase 3: Synthesize specialist reports into the final JSON itinerary.
-    """
-    prompt = f"""{_PHASE3_SYSTEM}
 
-User Profile:
+    Uses gemini-3.5-flash-lite (not compound-beta) — synthesis is pure JSON
+    generation, not web-search orchestration. compound-beta's routing overhead
+    causes 413 on prompts larger than ~1KB.
+    """
+    # Truncate each report defensively — verbose agents can produce 1K+ char outputs
+    MAX_REPORT_CHARS = 2000
+    flight_report  = results.get("flight",     "[Flight data unavailable]")[:MAX_REPORT_CHARS]
+    hotel_report   = results.get("hotel",      "[Hotel data unavailable]")[:MAX_REPORT_CHARS]
+    attract_report = results.get("attraction", "[Attractions data unavailable]")[:MAX_REPORT_CHARS]
+
+    synthesis_llm = ChatGoogleGenerativeAI(
+        model=SUB_AGENT_MODEL,
+        google_api_key=GOOGLE_API_KEY,
+        temperature=0.1,
+    )
+
+    user_prompt = f"""User Profile:
 {user_context}
 
 User Request: {user_query}
 
 --- FLIGHT SPECIALIST REPORT ---
-{results.get("flight", "[Flight data unavailable]")}
+{flight_report}
 
 --- HOTEL SPECIALIST REPORT ---
-{results.get("hotel", "[Hotel data unavailable]")}
+{hotel_report}
 
 --- ATTRACTIONS SPECIALIST REPORT ---
-{results.get("attraction", "[Attractions data unavailable]")}
+{attract_report}
 
-Now output the JSON itinerary array:
-"""
-    logger.info("Phase 3: Synthesizing itinerary...")
-    response = llm.invoke([HumanMessage(content=prompt)])
+Now output the JSON itinerary array:"""
+
+    logger.info("Phase 3: Synthesizing itinerary with %s...", SUB_AGENT_MODEL)
+    response = synthesis_llm.invoke([
+        SystemMessage(content=_PHASE3_SYSTEM),
+        HumanMessage(content=user_prompt),
+    ])
     logger.info("Phase 3 complete.")
     return response.content
 
@@ -329,7 +346,7 @@ def run_coordinator_agent(user_id: str, user_query: str, dna: dict | None = None
         results = _run_specialists_in_parallel(queries)
 
         # Phase 3: Synthesize into final itinerary
-        itinerary = _synthesize_itinerary(llm, user_query, user_context, results)
+        itinerary = _synthesize_itinerary(user_query, user_context, results)
 
         return itinerary
 
