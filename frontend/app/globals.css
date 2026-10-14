@@ -118,12 +118,17 @@
                 0 1px 0 rgba(255, 255, 255, 0.5) inset;
   }
 
-  /* Ambient gradient background — landing page, dashboard, login */
+  /* Ambient gradient background — dashboard, login, profile */
   .apex-hero-bg {
     background:
       radial-gradient(ellipse 60% 40% at 30% 20%, rgba(30, 43, 92, 0.06) 0%, transparent 60%),
       radial-gradient(ellipse 50% 60% at 80% 80%, rgba(184, 134, 78, 0.05) 0%, transparent 60%),
       #FAF9F6;
+  }
+
+  /* Landing hero section background — even, uniform sky-blue */
+  .apex-landing-hero-bg {
+    background-color: #EBF4FC;
   }
 
   /* Used for indigo-filled sections (onboarding left panel, final CTA) */

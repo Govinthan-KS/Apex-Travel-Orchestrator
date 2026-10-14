@@ -97,9 +97,23 @@ export default async function ProfilePage() {
     destination: string;
     budget:      number;
     days:        number;
-    itinerary:   unknown[];
+    itinerary:   Array<{ status?: string; description?: string }>;
     createdAt:   string;
-  }>);
+  }>).filter((trip) => {
+    if (!Array.isArray(trip.itinerary) || trip.itinerary.length === 0) return false;
+    return !trip.itinerary.some((item) => {
+      const desc = typeof item.description === 'string' ? item.description.toLowerCase() : '';
+      const stat = typeof item.status === 'string' ? item.status.toLowerCase() : '';
+      return (
+        desc.includes('coordinator error:') ||
+        desc.includes('validation error') ||
+        desc.includes('did not find google_api_key') ||
+        desc.includes('did not find groq_api_key') ||
+        desc.includes('error code:') ||
+        stat.includes('error')
+      );
+    });
+  });
 
   /* ── Pre-compute dominant preferences for DNACard ───────────────────── */
   const dominantFlightClass = getDominant(fw?.flightClass);

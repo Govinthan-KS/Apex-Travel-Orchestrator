@@ -114,25 +114,61 @@ export async function executePlanTrip(args: PlanArgs): Promise<TimelineEvent[]> 
   const planData = (await planRes.json()) as PlanResponse;
 
   /* ── 3. Parse itinerary JSON (LLM output can be noisy) ─────────────── */
+  const rawItinerary = planData.itinerary?.trim() || '';
+
+  const isErrorString = (text: string) => {
+    const lower = text.toLowerCase();
+    return (
+      lower.includes('coordinator error:') ||
+      lower.includes('validation error') ||
+      lower.includes('did not find google_api_key') ||
+      lower.includes('did not find groq_api_key') ||
+      lower.includes('traceback (most recent call last)') ||
+      lower.includes('error code:') ||
+      lower.startsWith('error:')
+    );
+  };
+
+  // If the backend returned an error string in the itinerary field, fail immediately
+  if (isErrorString(rawItinerary)) {
+    throw new Error(rawItinerary);
+  }
+
   let events: TimelineEvent[];
   try {
-    let raw = planData.itinerary;
+    let raw = rawItinerary;
     raw = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const arrayMatch = raw.match(/\[[\s\S]*\]/);
     if (arrayMatch) raw = arrayMatch[0];
     events = JSON.parse(raw) as TimelineEvent[];
-  } catch {
-    // Fallback: wrap raw text as a single event so the user always sees something
+
+    if (!Array.isArray(events) || events.length === 0) {
+      throw new Error('No timeline events could be generated for this trip.');
+    }
+  } catch (parseErr) {
+    if (isErrorString(rawItinerary) || rawItinerary.length < 40) {
+      throw new Error(rawItinerary || "The agents couldn't plan your trip.");
+    }
+    // Only wrap non-JSON if it represents actual itinerary text
     events = [{
       status:      'Your Itinerary',
       date:        'Full Plan',
       icon:        'pi pi-map',
-      description: planData.itinerary,
+      description: rawItinerary,
     }];
   }
 
-  /* ── 4. Save trip (fire-and-forget) ────────────────────────────────── */
-  if (events.length > 0) {
+  // Ensure no error events slip into database storage
+  const hasErrorEvent = events.some(
+    (e) => (e.description && isErrorString(e.description)) || (e.status && isErrorString(e.status))
+  );
+
+  if (hasErrorEvent) {
+    throw new Error(rawItinerary || 'Trip planning encountered an error.');
+  }
+
+  /* ── 4. Save trip (fire-and-forget) — only for successful trips ───── */
+  if (events.length > 0 && !hasErrorEvent) {
     let days = 3;
     if (startDate && endDate) {
       const start = new Date(startDate);

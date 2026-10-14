@@ -352,4 +352,4 @@ def run_coordinator_agent(user_id: str, user_query: str, dna: dict | None = None
 
     except Exception as e:
         logger.error("Coordinator error for user %s: %s", user_id, e, exc_info=True)
-        return f"Coordinator Error: {str(e)}. Please try a simpler request."
+        raise RuntimeError(f"Coordinator Error: {str(e)}. Please try a simpler request.")

@@ -32,7 +32,7 @@ const heroItems = [
 export function LandingHero() {
   return (
     <section
-      className="relative min-h-screen apex-hero-bg flex items-center overflow-hidden"
+      className="relative min-h-screen apex-landing-hero-bg flex items-center overflow-hidden"
       aria-labelledby="hero-headline"
     >
       {/* Max-width container, pt-16 clears the fixed navbar */}
@@ -120,15 +120,6 @@ export function LandingHero() {
           >
             {/* Canvas container */}
             <div className="relative w-full">
-              {/* Soft ambient glow behind canvas */}
-              <div
-                className="absolute inset-0 rounded-full pointer-events-none"
-                style={{
-                  background:
-                    'radial-gradient(ellipse at center, rgba(30,43,92,0.07) 0%, transparent 70%)',
-                }}
-                aria-hidden="true"
-              />
 
               {/* Globe canvas — desktop only, square container */}
               <div className="hidden lg:flex lg:items-center lg:justify-center h-[400px] w-full" aria-hidden="true">

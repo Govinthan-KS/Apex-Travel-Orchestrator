@@ -17,9 +17,26 @@ export async function GET() {
     await dbConnect();
 
     // Fetch trips sorted by newest first
-    const trips = await Trip.find({ userId: session.user.id })
+    const rawTrips = await Trip.find({ userId: session.user.id })
       .sort({ createdAt: -1 })
       .lean();
+
+    // Filter out any failed trips with error messages in their itinerary
+    const trips = rawTrips.filter((trip: any) => {
+      if (!Array.isArray(trip.itinerary) || trip.itinerary.length === 0) return false;
+      return !trip.itinerary.some((item: any) => {
+        const desc = typeof item.description === "string" ? item.description.toLowerCase() : "";
+        const stat = typeof item.status === "string" ? item.status.toLowerCase() : "";
+        return (
+          desc.includes("coordinator error:") ||
+          desc.includes("validation error") ||
+          desc.includes("did not find google_api_key") ||
+          desc.includes("did not find groq_api_key") ||
+          desc.includes("error code:") ||
+          stat.includes("error")
+        );
+      });
+    });
 
     return NextResponse.json({ trips });
   } catch (err: unknown) {
@@ -47,6 +64,30 @@ export async function POST(req: Request) {
     if (!data.destination || !data.budget || !data.days || !data.itinerary) {
       return NextResponse.json(
         { error: "Missing required trip fields." },
+        { status: 400 }
+      );
+    }
+
+    // Validate that the itinerary is genuine and not a failed coordinator output
+    const isErrorItinerary =
+      !Array.isArray(data.itinerary) ||
+      data.itinerary.length === 0 ||
+      data.itinerary.some((item: any) => {
+        const desc = typeof item.description === "string" ? item.description.toLowerCase() : "";
+        const stat = typeof item.status === "string" ? item.status.toLowerCase() : "";
+        return (
+          desc.includes("coordinator error:") ||
+          desc.includes("validation error") ||
+          desc.includes("did not find google_api_key") ||
+          desc.includes("did not find groq_api_key") ||
+          desc.includes("error code:") ||
+          stat.includes("error")
+        );
+      });
+
+    if (isErrorItinerary) {
+      return NextResponse.json(
+        { error: "Cannot save a failed or invalid itinerary." },
         { status: 400 }
       );
     }
