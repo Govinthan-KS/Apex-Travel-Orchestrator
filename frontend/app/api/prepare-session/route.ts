@@ -4,6 +4,9 @@ import dbConnect from "@/lib/mongodb";
 import Survey from "@/models/Survey";
 import FrequencyWeight from "@/models/FrequencyWeight";
 import crypto from "crypto";
+import { stableStringify } from "@/lib/stableStringify";
+
+export { stableStringify };
 
 /**
  * GET /api/prepare-session
@@ -119,23 +122,4 @@ export async function GET() {
   }
 }
 
-/**
- * Stable JSON stringify with sorted keys (recursive).
- * Matches Python's json.dumps(obj, sort_keys=True, separators=(",", ":"))
- */
-function stableStringify(obj: unknown): string {
-  if (obj === null || obj === undefined) return "null";
-  if (typeof obj === "number" || typeof obj === "boolean") return JSON.stringify(obj);
-  if (typeof obj === "string") return JSON.stringify(obj);
-  if (Array.isArray(obj)) {
-    return "[" + obj.map((item) => stableStringify(item)).join(",") + "]";
-  }
-  if (typeof obj === "object") {
-    const sortedKeys = Object.keys(obj as Record<string, unknown>).sort();
-    const pairs = sortedKeys.map(
-      (key) => JSON.stringify(key) + ":" + stableStringify((obj as Record<string, unknown>)[key])
-    );
-    return "{" + pairs.join(",") + "}";
-  }
-  return String(obj);
-}
+

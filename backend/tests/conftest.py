@@ -268,17 +268,17 @@ def golden_dna():
         "user_id": "usr_test_golden_12345",
         "weights": {
             "flight_class": {
-                "business": 0.0,
-                "economy": 1.0,
-                "first": 0.0,
-                "premium_economy": 0.0,
+                "business": 0,
+                "economy": 1,
+                "first": 0,
+                "premium_economy": 0,
             },
             "interests": ["culture", "food"],
             "stay_tier": {
-                "budget": 0.0,
-                "luxury": 0.0,
-                "mid_range": 1.0,
-                "resort": 0.0,
+                "budget": 0,
+                "luxury": 0,
+                "mid_range": 1,
+                "resort": 0,
             },
         },
     }
@@ -293,4 +293,5 @@ def golden_secret():
 @pytest.fixture
 def golden_expected_hmac():
     """Expected HMAC-SHA256 hex digest for golden_dna + golden_secret."""
-    return "066de3402c7c48b414b5e9043c79494ce0955a9a605fe5ec5b97ddc8f5092d76"
+    return "7bc51b18e8143619b8e0e46e152f3c3699d780b26571aa158d45b8226db11723"
+
