@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
+import type { TimelineEvent } from "@/lib/planTrip";
 
 /* ── TypeScript Interface ── */
 export interface ITrip extends Document {
@@ -7,7 +8,7 @@ export interface ITrip extends Document {
   budget: number;
   days: number;
   date: Date; // When the trip was planned (stored as native Date, formatted at render time)
-  itinerary: any[]; // The parsed JSON array of the timeline events
+  itinerary: TimelineEvent[]; // The parsed JSON array of the timeline events
   createdAt: Date;
   updatedAt: Date;
 }
