@@ -1,11 +1,24 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { Color, Vector3 } from "three";
+import { Color, Vector3, Group } from "three";
 import ThreeGlobe from "three-globe";
 import { useThree, Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import countries from "@/data/globe.json";
+
+interface CountryFeatureCollection {
+  type: string;
+  features: object[];
+}
+
+interface GlobePoint {
+  size: number;
+  order: number;
+  color: string;
+  lat: number;
+  lng: number;
+}
 
 const RING_PROPAGATION_SPEED = 3;
 const CAMERA_Z = 300;
@@ -75,7 +88,7 @@ export function genRandomNumbers(min: number, max: number, count: number) {
 
 export function Globe({ globeConfig = {}, data = [] }: WorldProps) {
   const globeRef = useRef<ThreeGlobe | null>(null);
-  const groupRef = useRef<any>(null);
+  const groupRef = useRef<Group | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   const defaultProps = useMemo(
@@ -100,16 +113,21 @@ export function Globe({ globeConfig = {}, data = [] }: WorldProps) {
 
   // Initialize ThreeGlobe instance and mount into group
   useEffect(() => {
-    if (!globeRef.current && groupRef.current) {
+    const group = groupRef.current;
+    let animId: number;
+    if (!globeRef.current && group) {
       const globe = new ThreeGlobe();
       globeRef.current = globe;
-      groupRef.current.add(globe);
-      setIsInitialized(true);
+      group.add(globe);
+      animId = requestAnimationFrame(() => {
+        setIsInitialized(true);
+      });
     }
 
     return () => {
-      if (globeRef.current && groupRef.current) {
-        groupRef.current.remove(globeRef.current);
+      cancelAnimationFrame(animId);
+      if (globeRef.current && group) {
+        group.remove(globeRef.current);
         globeRef.current = null;
       }
     };
@@ -182,7 +200,7 @@ export function Globe({ globeConfig = {}, data = [] }: WorldProps) {
     const globe = globeRef.current;
 
     globe
-      .hexPolygonsData((countries as any).features || [])
+      .hexPolygonsData((countries as CountryFeatureCollection).features || [])
       .hexPolygonResolution(3)
       .hexPolygonMargin(0.7)
       .showAtmosphere(defaultProps.showAtmosphere)
@@ -192,21 +210,21 @@ export function Globe({ globeConfig = {}, data = [] }: WorldProps) {
 
     globe
       .arcsData(data)
-      .arcStartLat((d: any) => d.startLat * 1)
-      .arcStartLng((d: any) => d.startLng * 1)
-      .arcEndLat((d: any) => d.endLat * 1)
-      .arcEndLng((d: any) => d.endLng * 1)
-      .arcColor((e: any) => e.color)
-      .arcAltitude((e: any) => e.arcAlt * 1)
+      .arcStartLat((d: object) => (d as Position).startLat * 1)
+      .arcStartLng((d: object) => (d as Position).startLng * 1)
+      .arcEndLat((d: object) => (d as Position).endLat * 1)
+      .arcEndLng((d: object) => (d as Position).endLng * 1)
+      .arcColor((e: object) => (e as Position).color)
+      .arcAltitude((e: object) => (e as Position).arcAlt * 1)
       .arcStroke(() => [0.32, 0.28, 0.3][Math.round(Math.random() * 2)])
       .arcDashLength(defaultProps.arcLength)
-      .arcDashInitialGap((e: any) => e.order * 1)
+      .arcDashInitialGap((e: object) => (e as Position).order * 1)
       .arcDashGap(15)
       .arcDashAnimateTime(() => defaultProps.arcTime);
 
     globe
       .pointsData(filteredPoints)
-      .pointColor((e: any) => e.color)
+      .pointColor((e: object) => (e as GlobePoint).color)
       .pointsMerge(true)
       .pointAltitude(0.0)
       .pointRadius(2);
