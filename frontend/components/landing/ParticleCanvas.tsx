@@ -12,6 +12,14 @@ import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+/* Deterministic pseudo-random float in [0, 1) to maintain pure rendering */
+function pseudoRandom(seed: number): number {
+  let t = (seed + 0x6d2b79f5) | 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 /* ── Particle mesh ──────────────────────────────────────────────────────── */
 function Particles({ count = 2400 }: { count?: number }) {
   const pointsRef = useRef<THREE.Points>(null);
@@ -26,8 +34,8 @@ function Particles({ count = 2400 }: { count?: number }) {
       const i2    = i + 0.5;
       const phi   = Math.acos(1 - (2 * i2) / count);
       const theta = 2 * Math.PI * (i2 / golden);
-      /* Add slight random variation in radius for depth */
-      const r = 1.6 + (Math.random() - 0.5) * 0.5;
+      /* Add slight deterministic pseudo-random variation in radius for depth */
+      const r = 1.6 + (pseudoRandom(i) - 0.5) * 0.5;
 
       positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
