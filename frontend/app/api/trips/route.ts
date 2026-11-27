@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
-import Trip from "@/models/Trip";
+import Trip, { type ITrip } from "@/models/Trip";
+import type { TimelineEvent } from "@/lib/planTrip";
 
 /*
  * GET /api/trips
@@ -22,9 +23,9 @@ export async function GET() {
       .lean();
 
     // Filter out any failed trips with error messages in their itinerary
-    const trips = rawTrips.filter((trip: any) => {
+    const trips = rawTrips.filter((trip: ITrip) => {
       if (!Array.isArray(trip.itinerary) || trip.itinerary.length === 0) return false;
-      return !trip.itinerary.some((item: any) => {
+      return !trip.itinerary.some((item: TimelineEvent) => {
         const desc = typeof item.description === "string" ? item.description.toLowerCase() : "";
         const stat = typeof item.status === "string" ? item.status.toLowerCase() : "";
         return (
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
     const isErrorItinerary =
       !Array.isArray(data.itinerary) ||
       data.itinerary.length === 0 ||
-      data.itinerary.some((item: any) => {
+      data.itinerary.some((item: TimelineEvent) => {
         const desc = typeof item.description === "string" ? item.description.toLowerCase() : "";
         const stat = typeof item.status === "string" ? item.status.toLowerCase() : "";
         return (

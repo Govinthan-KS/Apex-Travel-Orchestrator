@@ -31,6 +31,14 @@ export default function Navbar() {
   const [scrolled,     setScrolled]     = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileOpen,   setMobileOpen]   = useState(false);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+
+  /* ── Close menus on route change during render ────────────────────────── */
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setMobileOpen(false);
+    setDropdownOpen(false);
+  }
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -60,12 +68,6 @@ export default function Navbar() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  /* ── Close menus on route change ─────────────────────────────────────── */
-  useEffect(() => {
-    setMobileOpen(false);
-    setDropdownOpen(false);
-  }, [pathname]);
 
   /* ── Escape key ──────────────────────────────────────────────────────── */
   useEffect(() => {

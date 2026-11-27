@@ -62,6 +62,25 @@ function buildQuery(args: PlanArgs): string {
   return query;
 }
 
+export const isErrorString = (text: string): boolean => {
+  const lower = text.toLowerCase();
+  return (
+    lower.includes('coordinator error:') ||
+    lower.includes('validation error') ||
+    lower.includes('did not find google_api_key') ||
+    lower.includes('did not find groq_api_key') ||
+    lower.includes('traceback (most recent call last)') ||
+    lower.includes('error code:') ||
+    lower.startsWith('error:')
+  );
+};
+
+export const hasErrorEvent = (events: TimelineEvent[]): boolean =>
+  events.some(
+    (e) => (e.description && isErrorString(e.description)) || (e.status && isErrorString(e.status))
+  );
+
+
 /**
  * executePlanTrip — throws on any unrecoverable error with a user-friendly message.
  * The component catches and displays the error; this function never calls toasts.
@@ -116,19 +135,6 @@ export async function executePlanTrip(args: PlanArgs): Promise<TimelineEvent[]> 
   /* ── 3. Parse itinerary JSON (LLM output can be noisy) ─────────────── */
   const rawItinerary = planData.itinerary?.trim() || '';
 
-  const isErrorString = (text: string) => {
-    const lower = text.toLowerCase();
-    return (
-      lower.includes('coordinator error:') ||
-      lower.includes('validation error') ||
-      lower.includes('did not find google_api_key') ||
-      lower.includes('did not find groq_api_key') ||
-      lower.includes('traceback (most recent call last)') ||
-      lower.includes('error code:') ||
-      lower.startsWith('error:')
-    );
-  };
-
   // If the backend returned an error string in the itinerary field, fail immediately
   if (isErrorString(rawItinerary)) {
     throw new Error(rawItinerary);
@@ -159,16 +165,14 @@ export async function executePlanTrip(args: PlanArgs): Promise<TimelineEvent[]> 
   }
 
   // Ensure no error events slip into database storage
-  const hasErrorEvent = events.some(
-    (e) => (e.description && isErrorString(e.description)) || (e.status && isErrorString(e.status))
-  );
+  const hasError = hasErrorEvent(events);
 
-  if (hasErrorEvent) {
+  if (hasError) {
     throw new Error(rawItinerary || 'Trip planning encountered an error.');
   }
 
   /* ── 4. Save trip (fire-and-forget) — only for successful trips ───── */
-  if (events.length > 0 && !hasErrorEvent) {
+  if (events.length > 0 && !hasError) {
     let days = 3;
     if (startDate && endDate) {
       const start = new Date(startDate);
